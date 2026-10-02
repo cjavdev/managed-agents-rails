@@ -14,7 +14,6 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = ">= 3.2"
 
-  spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = spec.homepage
   spec.metadata["changelog_uri"] = "#{spec.homepage}/blob/main/CHANGELOG.md"
   spec.metadata["rubygems_mfa_required"] = "true"
@@ -23,6 +22,9 @@ Gem::Specification.new do |spec|
     Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md", "CHANGELOG.md"]
   end
 
-  spec.add_dependency "rails", ">= 7.2"
-  spec.add_dependency "anthropic", ">= 1.72"
+  # Only the frameworks the engine uses, not all of Rails. railties brings actionpack.
+  spec.add_dependency "railties", ">= 7.2", "< 9"
+  spec.add_dependency "activerecord", ">= 7.2", "< 9"
+  spec.add_dependency "activejob", ">= 7.2", "< 9"
+  spec.add_dependency "anthropic", "~> 1.72"
 end

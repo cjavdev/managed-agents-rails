@@ -2,8 +2,10 @@ PATH
   remote: .
   specs:
     managed_agents (0.1.0)
-      anthropic (>= 1.72)
-      rails (>= 7.2)
+      activejob (>= 7.2, < 9)
+      activerecord (>= 7.2, < 9)
+      anthropic (~> 1.72)
+      railties (>= 7.2, < 9)
 
 GEM
   remote: https://rubygems.org/
@@ -301,6 +303,7 @@ DEPENDENCIES
   managed_agents!
   propshaft
   puma
+  rails
   sqlite3
   standard
   turbo-rails
