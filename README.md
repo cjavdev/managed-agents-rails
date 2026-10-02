@@ -2,7 +2,7 @@
 
 [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) for Rails.
 
-Define agents as files under `app/agents`, sync them to the Claude API the way you run migrations,
+[Define agents](#defining-agents) as files under `app/agents`, sync them to the Claude API the way you run migrations,
 keep the remote IDs in your database, start sessions from your app, answer the agent's custom tools
 in Ruby, and generate a chat UI.
 
