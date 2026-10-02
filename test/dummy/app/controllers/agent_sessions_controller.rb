@@ -1,21 +1,24 @@
 class AgentSessionsController < ApplicationController
-  # Anyone who can reach these actions can talk to your agents and see every
-  # session. Put your own authentication here before deploying.
-  # before_action :authenticate_user!
+  include AgentAccess
 
   def index
-    @sessions = ManagedAgents::Session.recent.limit(50)
+    @sessions = agent_sessions.recent.limit(50)
     @agents = ManagedAgents.definitions
+    @missing = @agents.to_h { |agent| [agent.name, ManagedAgents.agent(agent.name).missing_connections(owner: agent_owner)] }
   end
 
   def show
-    @session = ManagedAgents::Session.find(params[:id])
+    @session = agent_sessions.find(params[:id])
     @events = @session.events
   end
 
+  # The session acts with the vaults its agent declares (`vaults` in the agent
+  # class). Pass `vaults:` here to choose per session instead, for example
+  # `vaults: [agent_owner, :agent]`.
   def create
     agent = ManagedAgents.agent(params.require(:agent))
-    agent_session = agent.start(params[:message].presence, title: params[:message].to_s.truncate(60).presence)
+    agent_session = agent.start(params[:message].presence, owner: agent_owner,
+      title: params[:message].to_s.truncate(60).presence)
     redirect_to agent_session_path(agent_session)
   rescue ManagedAgents::Error, Anthropic::Errors::Error => error
     redirect_to agent_sessions_path, alert: error.message

@@ -24,6 +24,30 @@ class WebhookJobTest < ActiveSupport::TestCase
     assert_equal "daily", ManagedAgents::Session.find_by!(remote_id: "sesn_fired").deployment_key
   end
 
+  test "a failed token refresh is checked, and marks the connection when the grant is gone" do
+    connection = User.create!(name: "Dana").agent_vault!.connect_oauth("https://mcp.linear.app/mcp", access_token: "at")
+    anthropic.beta.vaults.credentials.validation_status = "invalid"
+
+    ManagedAgents::WebhookJob.perform_now("vault_credential.refresh_failed", connection.remote_id)
+
+    assert connection.reload.needs_reauthorization?
+  end
+
+  test "credentials and vaults removed on the API are forgotten locally without calling it again" do
+    vault = User.create!(name: "Dana").agent_vault!
+    connection = vault.connect_bearer("https://mcp.linear.app/mcp", token: "t")
+    kept = vault.connect_bearer("https://mcp.notion.com/mcp", token: "t")
+    anthropic.calls.clear
+
+    ManagedAgents::WebhookJob.perform_now("vault_credential.archived", connection.remote_id)
+    assert_equal [kept], vault.connections.to_a
+
+    ManagedAgents::WebhookJob.perform_now("vault.deleted", vault.remote_id)
+    assert_equal 0, ManagedAgents::Vault.count
+    assert_equal 0, ManagedAgents::Connection.count
+    assert_empty anthropic.calls
+  end
+
   test "every delivery is published for the app to subscribe to" do
     seen = []
     subscription = ActiveSupport::Notifications.subscribe("webhook.managed_agents") { |event| seen << event.payload }

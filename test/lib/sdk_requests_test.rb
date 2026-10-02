@@ -78,6 +78,35 @@ class SdkRequestsTest < ActiveSupport::TestCase
     assert_equal "5", resource("helper", "agent").remote_version
   end
 
+  test "a person's vault and OAuth credential are created with the shapes the API expects" do
+    user = User.create!(name: "Dana")
+    stub_api(:post, "vaults", {id: "vlt_9", type: "vault", display_name: "User #{user.id}"})
+    stub_api(:post, "vaults/vlt_9/credentials", {id: "vcrd_9", type: "vault_credential", vault_id: "vlt_9"})
+    stub_api(:post, "vaults/vlt_9/credentials/vcrd_9", {id: "vcrd_9", type: "vault_credential", vault_id: "vlt_9"})
+    stub_api(:post, "vaults/vlt_9/credentials/vcrd_9/mcp_oauth_validate",
+      {type: "vault_credential_validation", credential_id: "vcrd_9", vault_id: "vlt_9", status: "invalid"})
+
+    vault = user.agent_vault!
+    connection = vault.connect_oauth("https://mcp.linear.app/mcp", access_token: "at", refresh_token: "rt",
+      expires_at: Time.utc(2026, 10, 2, 12), token_endpoint: "https://linear.app/oauth/token", client_id: "client-1", scope: "read")
+
+    assert_equal({"display_name" => "User #{user.id}", "metadata" => {"owner" => user.to_gid.to_s, "name" => "default"}}, body_of(:post, "vaults"))
+    created = body_of(:post, "vaults/vlt_9/credentials")
+    refute created.key?("display_name"), "an unset display name is left out rather than sent as null"
+    assert_equal({"type" => "mcp_oauth", "mcp_server_url" => "https://mcp.linear.app/mcp", "access_token" => "at",
+      "expires_at" => "2026-10-02T12:00:00Z",
+      "refresh" => {"refresh_token" => "rt", "token_endpoint" => "https://linear.app/oauth/token", "client_id" => "client-1",
+                    "scope" => "read", "token_endpoint_auth" => {"type" => "none"}}}, created["auth"])
+
+    vault.connect_oauth("https://mcp.linear.app/mcp", access_token: "at-2", refresh_token: "rt-2",
+      token_endpoint: "https://linear.app/oauth/token", client_id: "client-1", scope: "read")
+    rotated = body_of(:post, "vaults/vlt_9/credentials/vcrd_9")
+    assert_equal({"type" => "mcp_oauth", "access_token" => "at-2",
+      "refresh" => {"refresh_token" => "rt-2", "scope" => "read", "token_endpoint_auth" => {"type" => "none"}}}, rotated["auth"])
+
+    assert connection.check!.needs_reauthorization?
+  end
+
   test "starting a session and following it works against the SDK's event types" do
     ManagedAgents::Testing::FakeClient.new.then do |fake|
       ManagedAgents.config.client = fake

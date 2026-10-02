@@ -19,6 +19,15 @@ ManagedAgents.configure do |config|
   # queue with threads to spare.
   # config.queue = :agents
 
+  # OAuth clients for MCP servers that don't offer dynamic client registration.
+  # config.oauth_clients = {
+  #   "https://mcp.slack.com/mcp" => {
+  #     client_id: Rails.application.credentials.dig(:slack, :client_id),
+  #     client_secret: Rails.application.credentials.dig(:slack, :client_secret),
+  #     scope: "channels:read chat:write"
+  #   }
+  # }
+
   # Render agent messages as Markdown. The result is inserted as HTML.
   # config.markdown = ->(text) { Commonmarker.to_html(text) }
 end

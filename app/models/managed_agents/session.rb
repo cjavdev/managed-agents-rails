@@ -6,12 +6,14 @@ module ManagedAgents
     ].freeze
 
     belongs_to :subject, polymorphic: true, optional: true
+    belongs_to :owner, polymorphic: true, optional: true
     has_many :events, -> { order(:id) }, dependent: :delete_all, inverse_of: :session
 
     validates :remote_id, :agent_name, presence: true
 
     scope :recent, -> { order(created_at: :desc) }
     scope :for_agent, ->(name) { where(agent_name: name.to_s) }
+    scope :owned_by, ->(owner) { where(owner: owner) }
 
     after_update_commit :broadcast_status, if: -> { saved_change_to_status? || saved_change_to_title? }
 

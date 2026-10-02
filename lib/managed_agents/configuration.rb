@@ -45,6 +45,14 @@ module ManagedAgents
     # Stream partial assistant text to the page while the model is writing.
     attr_accessor :stream_deltas
 
+    # OAuth clients for MCP servers that don't offer dynamic client
+    # registration, keyed by server URL:
+    #   {"https://mcp.slack.com/mcp" => {client_id: "...", client_secret: "...", scope: "channels:read"}}
+    attr_accessor :oauth_clients
+
+    # The name people see on an MCP server's consent screen.
+    attr_writer :oauth_client_name
+
     # Optional callable turning an agent message into HTML, for example
     # ->(text) { Commonmarker.to_html(text) }. The result is not escaped.
     attr_accessor :markdown
@@ -60,8 +68,13 @@ module ManagedAgents
       @stream_window = 300
       @max_run_time = 1800
       @reconnect_delay = 0.5
+      @oauth_clients = {}
       @broadcast = true
       @stream_deltas = true
+    end
+
+    def oauth_client_name
+      @oauth_client_name || Rails.application.class.module_parent_name.titleize
     end
 
     def workspace_id

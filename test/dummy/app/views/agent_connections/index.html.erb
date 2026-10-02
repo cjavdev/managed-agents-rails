@@ -1,0 +1,53 @@
+<div class="ma-page">
+  <header class="ma-header">
+    <h1>Connections</h1>
+  </header>
+
+  <% if notice.present? %><p class="ma-note"><%= notice %></p><% end %>
+  <% if alert.present? %><p class="ma-note ma-note--error"><%= alert %></p><% end %>
+
+  <% if @servers.empty? %>
+    <p class="ma-note">None of your agents declare an MCP server.</p>
+  <% elsif @owners.empty? %>
+    <p class="ma-note">Sign in to manage connections.</p>
+  <% end %>
+
+  <% @servers.each do |server| %>
+    <section class="ma-connection">
+      <h2><%= server.name.humanize %></h2>
+      <p class="ma-note"><%= server.url %> · used by <%= server.agents.map(&:humanize).to_sentence %></p>
+
+      <% @owners.each do |group, owner| %>
+        <% connection = ManagedAgents::Vault.find_by(owner: owner, name: ManagedAgents::Vault::DEFAULT)&.connection(server.url) %>
+        <div class="ma-connection__row">
+          <span class="ma-connection__group"><%= group.humanize %></span>
+
+          <% if connection&.usable? %>
+            <span class="ma-status ma-status--running">Connected</span>
+          <% elsif connection %>
+            <span class="ma-status ma-status--requires-action">Needs reconnecting</span>
+          <% else %>
+            <span class="ma-status">Not connected</span>
+          <% end %>
+
+          <%# The authorization page is on another site, which Turbo can't follow. %>
+          <%= button_to connection ? "Reconnect" : "Connect", agent_connections_path,
+                params: {server_url: server.url, group: group}, class: "ma-button", data: {turbo: false} %>
+          <% if connection %>
+            <%= button_to "Disconnect", agent_connection_path(connection), method: :delete, class: "ma-button ma-button--quiet" %>
+          <% end %>
+        </div>
+
+        <details class="ma-connection__token">
+          <summary>Use an API token instead</summary>
+          <%= form_with url: agent_connections_path, class: "ma-composer" do |form| %>
+            <%= form.hidden_field :server_url, value: server.url %>
+            <%= form.hidden_field :group, value: group %>
+            <%= form.password_field :token, required: true, autocomplete: "off", aria: {label: "#{server.name.humanize} token for #{group}"} %>
+            <%= form.submit "Save token", class: "ma-button ma-button--quiet" %>
+          <% end %>
+        </details>
+      <% end %>
+    </section>
+  <% end %>
+</div>

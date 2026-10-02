@@ -1,6 +1,8 @@
 class AgentSessions::MessagesController < ApplicationController
+  include AgentAccess
+
   def create
-    agent_session = ManagedAgents::Session.find(params[:agent_session_id])
+    agent_session = agent_sessions.find(params[:agent_session_id])
     agent_session.send_message(params.require(:message))
 
     respond_to do |format|

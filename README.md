@@ -160,7 +160,129 @@ credentials:
 - Rotating the secret and syncing again updates the credential in place. Only a keyed digest of the
   secret is stored locally.
 
-The agent's vault is attached to every session it starts.
+The agent's vault is attached to every session it starts, unless the session asks for other vaults.
+
+## Users, organisations and their credentials
+
+The vault in `vault.yaml` is shared by everyone. For credentials that belong to a person or to an
+organisation, any record can own a vault, and each session says whose it acts with.
+
+```ruby
+class User < ApplicationRecord
+  belongs_to :account
+  has_agent_sessions as: :owner   # user.agent_sessions
+  has_agent_vault                 # personal connections
+end
+
+class Account < ApplicationRecord
+  has_agent_vault                 # shared service accounts
+end
+```
+
+### Choosing vaults for a session
+
+`owner:` is who the session belongs to. `vaults:` is whose credentials it uses, in order: when two
+vaults hold a credential for the same MCP server, the first one wins.
+
+```ruby
+ResearchAgent.start("…", owner: user, vaults: [user, user.account, :agent])  # personal, then shared, then vault.yaml
+ResearchAgent.start("…", owner: user, vaults: [user.account])                # the organisation's only
+ResearchAgent.start("…", owner: user, vaults: [user])                        # personal only
+ResearchAgent.start("…", owner: user, vaults: [])                            # none
+```
+
+An entry can be a record, a `ManagedAgents::Vault`, a vault ID, `:agent` (the agent's `vault.yaml`),
+`:owner`, or another symbol that is called on the owner (`:account`). A record that has connected
+nothing is skipped. Without `vaults:`, a session gets the agent's default, which is `[:agent]`
+unless the class declares otherwise:
+
+```ruby
+class ResearchAgent < ApplicationAgent
+  vaults :owner, :account, :agent
+end
+```
+
+Personal credentials are only ever attached when asked for, and `:owner` without an `owner:` raises.
+Sessions the app starts by itself (jobs, scheduled deployments) should name shared vaults only.
+
+`ResearchAgent.missing_connections(owner: user)` returns the MCP servers the agent declares that no
+vault in the chain has a credential for, so you can ask the person to connect them first.
+
+An owner can keep more than one group of credentials: `account.agent_vault!(:billing)`.
+
+### Storing credentials
+
+```ruby
+vault = user.agent_vault!   # created on the API the first time
+vault.connect_bearer("https://mcp.linear.app/mcp", token: "lin_api_…")
+vault.connect_oauth("https://mcp.notion.com/mcp", access_token: "…", refresh_token: "…",
+  token_endpoint: "https://…/token", client_id: "…")
+vault.connect_env("STRIPE_API_KEY", value: "sk_…", allowed_hosts: ["api.stripe.com"])
+vault.connected?("https://mcp.linear.app/mcp")
+vault.disconnect("https://mcp.linear.app/mcp")
+```
+
+Secrets go straight to the vault; the local `managed_agents_connections` row keeps only what
+identifies the credential and its status. Connecting again rotates the credential in place.
+Destroying the owner archives its vaults.
+
+### Connecting MCP servers with OAuth
+
+```sh
+bin/rails generate managed_agents:connections --organization "current_user.account"
+```
+
+generates `/agent_connections`: every MCP server your agents declare, with Connect, Reconnect and
+Disconnect for each group of credentials the person may manage (or a field to paste a token).
+Connect runs the MCP authorization flow: discovery of the server's authorization server, dynamic
+client registration, PKCE, and the token exchange. The tokens are stored with their refresh
+settings so Anthropic keeps them fresh.
+
+The same flow is available to your own controllers:
+
+```ruby
+pending = ManagedAgents::OAuth.authorize(server_url, redirect_uri: callback_url)
+session[:agent_connection] = pending.to_h
+redirect_to pending.url, allow_other_host: true
+
+# in the callback
+ManagedAgents::OAuth.complete(current_user, session.delete(:agent_connection), params)
+```
+
+Servers that don't offer dynamic client registration need a client of your own:
+
+```ruby
+config.oauth_clients = {
+  "https://mcp.slack.com/mcp" => {client_id: "…", client_secret: "…", scope: "channels:read"}
+}
+```
+
+When a refresh token stops working, the `vault_credential.refresh_failed` webhook marks the
+connection as needing to be reconnected, and it no longer counts as connected.
+
+### Who can see what
+
+The generated controllers look everything up through `app/controllers/concerns/agent_access.rb`:
+
+```ruby
+def agent_owner = current_user                      # sessions are scoped to this record
+def agent_vault_owners                              # whose credentials this person may manage
+  {"personal" => agent_owner, "organization" => current_user.account}.compact
+end
+```
+
+The generators fill in `Current.user` or `current_user` when they find Rails' authentication
+generator or Devise, and accept `--owner` and `--organization`. Tool handlers have `owner` next to
+`subject`, to scope what the agent may touch:
+
+```ruby
+tool :find_ticket do |input|
+  owner.account.tickets.find(input[:id]).as_json
+end
+```
+
+Vaults are workspace-wide on the API (any session can attach any vault ID), so this scoping is what
+keeps tenants apart.
 
 ## Running sessions
 
@@ -245,7 +367,9 @@ bin/rails generate managed_agents:chat
 
 Generates `AgentSessionsController` (plus nested controllers for messages, tool approvals and
 interrupt), views, a Stimulus controller and a plain-CSS stylesheet. The code is yours to change.
-**Add authentication before deploying it**: the generated controller has a marked spot.
+Sessions are scoped to `agent_owner` (see [Who can see what](#who-can-see-what)). **If no
+authentication is detected, `agent_owner` is nil and sessions are not scoped to a person**: set it
+before deploying.
 
 The transcript shows messages, tool calls with their input and results, approval prompts for tools
 with an `always_ask` policy, and streams assistant text while it is written. Live updates use Turbo
@@ -285,7 +409,7 @@ The helper swaps in an in-memory client for each test. `anthropic.calls` records
 
 ## Not covered yet
 
-Skills and memory stores as files, multiagent rosters, MCP OAuth login flows, per-user vaults,
+Skills and memory stores as files, multiagent rosters, per-tenant agent definitions or overrides,
 outcomes, and self-hosted sandboxes.
 
 ## Development
