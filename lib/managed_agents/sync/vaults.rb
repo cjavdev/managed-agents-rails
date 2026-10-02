@@ -3,10 +3,7 @@ module ManagedAgents
     # Creates the vault declared in vault.yaml and fills it with credentials
     # resolved from Rails credentials or ENV.
     class Vaults
-      IMMUTABLE = %w[mcp_server_url secret_name].freeze
-      IMMUTABLE_REFRESH = %w[token_endpoint client_id].freeze
-
-      # What makes a credential unique inside a vault.
+      # What makes a credential unique inside a vault, as written in the file.
       def self.key(credential)
         auth = credential["auth"] || {}
         (auth["mcp_server_url"] || auth["secret_name"]).to_s
@@ -105,11 +102,8 @@ module ManagedAgents
         @client.beta.vaults.credentials.update(resource.remote_id, vault_id: vault_id, **mutable(body).deep_symbolize_keys)
       end
 
-      # The keys a credential is matched on can't change once it exists.
       def mutable(body)
-        auth = body["auth"].except(*IMMUTABLE)
-        auth["refresh"] = auth["refresh"].except(*IMMUTABLE_REFRESH) if auth["refresh"].is_a?(Hash)
-        body.merge("auth" => auth)
+        body.merge("auth" => CredentialAuth.mutable(body["auth"]))
       end
     end
   end

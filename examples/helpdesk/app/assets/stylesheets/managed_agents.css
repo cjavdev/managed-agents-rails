@@ -114,3 +114,18 @@
   border-top: 1px solid var(--ma-line);
 }
 .ma-session-list__meta { flex: 1; color: var(--ma-muted); font-size: 0.875rem; }
+
+.ma-connection { padding: 1rem 0; border-top: 1px solid var(--ma-line); }
+.ma-connection h2 { margin: 0; font-size: 1.0625rem; }
+.ma-connection__row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
+.ma-connection__group { flex: 1; }
+.ma-connection__token { margin: 0.375rem 0 0.75rem; color: var(--ma-muted); font-size: 0.875rem; }
+.ma-connection__token input[type="password"] {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--ma-line);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}

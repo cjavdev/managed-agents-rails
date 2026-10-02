@@ -138,6 +138,15 @@ module ManagedAgents
       def list(vault_id, **) = Page.new(@records.values.select { |record| record.vault_id == vault_id })
 
       def archive(id, vault_id:, **) = super(id)
+
+      # What the next validations report: "valid", "invalid" or "unknown".
+      attr_writer :validation_status
+
+      def mcp_oauth_validate(id, vault_id:, **)
+        @client.calls << [:"#{@prefix}.validate", {id: id}]
+        Record.new(type: "vault_credential_validation", credential_id: id, vault_id: vault_id,
+          status: @validation_status || "valid")
+      end
     end
 
     class Vaults < Collection

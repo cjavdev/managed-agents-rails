@@ -1,4 +1,7 @@
 Rails.application.routes.draw do
+  resources :agent_connections, only: [:index, :create, :destroy] do
+    get :callback, on: :collection
+  end
   resources :agent_sessions, only: [:index, :show, :create] do
     scope module: :agent_sessions do
       resources :messages, only: :create

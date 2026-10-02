@@ -17,6 +17,7 @@ module ManagedAgents
     class_attribute :tools, default: {}
     class_attribute :turn_callbacks, default: []
     class_attribute :error_callbacks, default: []
+    class_attribute :default_vaults, default: [:agent]
 
     class << self
       attr_writer :agent_name
@@ -31,9 +32,11 @@ module ManagedAgents
         Class.new(base).tap { |anonymous| anonymous.agent_name = name.to_s }
       end
 
+      # SupportTriageAgent is "support_triage". An unnamed subclass is the same
+      # agent as its parent.
       def agent_name
-        @agent_name ||= name.to_s.delete_suffix("Agent").underscore.presence ||
-          raise(Error, "Set `self.agent_name = \"...\"` on anonymous agent classes")
+        @agent_name ||= name&.delete_suffix("Agent")&.underscore.presence ||
+          ((superclass < Agent) ? superclass.agent_name : raise(Error, "Set `self.agent_name = \"...\"` on anonymous agent classes"))
       end
 
       def definition
@@ -44,6 +47,17 @@ module ManagedAgents
       # instance, so `session` and `subject` are available.
       def tool(name, &handler)
         self.tools = tools.merge(name.to_s => handler)
+      end
+
+      # The vaults a session gets unless `start` is told otherwise, in order of
+      # precedence. See ManagedAgents::VaultChain for what an entry can be.
+      #
+      #   vaults :owner, :account, :agent   # personal, then the account's, then vault.yaml
+      #
+      # Personal vaults only make sense for sessions a person started. Work
+      # the app starts on its own should name service-account vaults only.
+      def vaults(*sources)
+        self.default_vaults = sources.flatten
       end
 
       # Runs when the agent finishes a turn.
@@ -64,8 +78,15 @@ module ManagedAgents
         Resource.lookup(definition.name, "agent")&.remote_version&.to_i
       end
 
-      def vault_ids
-        [Resource.lookup(definition.name, "vault")&.remote_id].compact
+      def vault_chain(vaults = default_vaults, owner: nil)
+        VaultChain.new(vaults, agent: self, owner: owner)
+      end
+
+      # MCP servers this agent declares that no vault in the chain has a
+      # credential for. A session started without them would fail to connect.
+      def missing_connections(owner: nil, vaults: default_vaults)
+        chain = vault_chain(vaults, owner: owner)
+        MCP.servers([definition]).reject { |server| chain.covers?(server.url) }
       end
 
       def synced?
@@ -73,18 +94,23 @@ module ManagedAgents
       end
 
       # Creates a session and, when given a message, sends it and starts
-      # following the session in a background job. `max_cost` is a hard spend
-      # cap in dollars.
-      def start(message = nil, subject: nil, title: nil, metadata: nil, resources: nil, vault_ids: nil,
-        max_cost: nil, pin_version: true, run: true)
+      # following the session in a background job.
+      #
+      #   owner:    who the session belongs to, for scoping who may see it
+      #   vaults:   whose credentials it acts with, in order of precedence;
+      #             defaults to the agent's `vaults` declaration
+      #   max_cost: a hard spend cap in dollars
+      def start(message = nil, subject: nil, owner: nil, vaults: default_vaults, title: nil, metadata: nil,
+        resources: nil, max_cost: nil, pin_version: true, run: true)
         version = agent_version if pin_version
+        vault_ids = vault_chain(vaults, owner: owner).remote_ids
         params = {
           agent: version ? {type: "agent", id: agent_id, version: version} : agent_id,
           environment_id: environment_id,
           title: title,
           metadata: metadata&.transform_values(&:to_s),
           resources: resources,
-          vault_ids: (vault_ids || self.vault_ids).presence,
+          vault_ids: vault_ids.presence,
           budget: max_cost && {type: "limit", max_list_cost: {amount: (max_cost * 100).round.to_s, currency: "USD"}}
         }.compact
 
@@ -94,6 +120,8 @@ module ManagedAgents
           agent_name: definition.name,
           agent_version: version,
           subject: subject,
+          owner: owner,
+          vault_ids: vault_ids,
           title: title,
           metadata: metadata
         )
@@ -116,6 +144,8 @@ module ManagedAgents
     end
 
     def subject = session.subject
+
+    def owner = session.owner
 
     def call_tool(name, input)
       handler = tools[name.to_s]

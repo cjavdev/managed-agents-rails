@@ -10,3 +10,6 @@
 - Webhook endpoint and adoption of sessions started by scheduled deployments.
 - Generators: `install`, `agent`, `chat` and `views`.
 - `ManagedAgents::Testing` fake client for app tests.
+- Sessions have an `owner`; the generated chat UI only shows a person their own.
+- Vaults owned by any record (`has_agent_vault`), combined per session with `vaults:`.
+- MCP OAuth connect flow and a `connections` generator.

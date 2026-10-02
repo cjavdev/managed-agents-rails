@@ -23,12 +23,14 @@ class CreateManagedAgentsTables < ActiveRecord::Migration[ActiveRecord::Migratio
       t.string :agent_name, null: false
       t.integer :agent_version
       t.references :subject, polymorphic: true
+      t.references :owner, polymorphic: true
       t.string :title
       t.string :status, null: false, default: "idle"
       t.string :stop_reason
       t.string :deployment_key
       t.json :metadata
       t.json :usage
+      t.json :vault_ids
       t.string :lease_token
       t.datetime :lease_expires_at
       t.datetime :archived_at
@@ -48,6 +50,42 @@ class CreateManagedAgentsTables < ActiveRecord::Migration[ActiveRecord::Migratio
 
       t.index :remote_id, unique: true
       t.index [:session_id, :event_type]
+    end
+
+    create_table :managed_agents_vaults do |t|
+      t.references :owner, polymorphic: true, null: false, index: false
+      t.string :name, null: false, default: "default"
+      t.string :remote_id, null: false
+      t.string :workspace_id
+      t.timestamps
+
+      t.index [:owner_type, :owner_id, :name], unique: true
+      t.index :remote_id, unique: true
+    end
+
+    create_table :managed_agents_connections do |t|
+      t.references :vault, null: false, foreign_key: {to_table: :managed_agents_vaults}
+      t.string :key, null: false
+      t.string :kind, null: false
+      t.string :remote_id, null: false
+      t.string :display_name
+      t.string :status, null: false, default: "active"
+      t.json :details
+      t.timestamps
+
+      t.index [:vault_id, :key], unique: true
+      t.index :remote_id, unique: true
+    end
+
+    create_table :managed_agents_oauth_clients do |t|
+      t.string :server_url, null: false
+      t.string :redirect_uri, null: false
+      t.string :client_id, null: false
+      t.text :client_secret
+      t.json :metadata
+      t.timestamps
+
+      t.index [:server_url, :redirect_uri], unique: true
     end
   end
 end
