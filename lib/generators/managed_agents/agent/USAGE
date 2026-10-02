@@ -1,0 +1,12 @@
+Description:
+    Scaffolds an agent definition under app/agents/NAME/ and its Ruby class.
+
+Example:
+    bin/rails generate managed_agents:agent support_triage --deployments daily --vault
+
+    creates:
+        app/agents/support_triage/agent.md
+        app/agents/support_triage/environment.yaml
+        app/agents/support_triage/vault.yaml
+        app/agents/support_triage/deployment-daily.yaml
+        app/agents/support_triage_agent.rb

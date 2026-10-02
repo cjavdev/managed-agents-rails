@@ -1,0 +1,14 @@
+<%= turbo_stream_from @board, :lists %>
+
+<div class="board-page ma-page">
+  <section class="board">
+    <header class="board__header">
+      <%= link_to "Boards", boards_path, class: "muted" %>
+      <h1><%= @board.name %></h1>
+    </header>
+
+    <%= render "boards/lists", board: @board %>
+  </section>
+
+  <%= render "boards/assistant", board: @board, agent_session: @session %>
+</div>

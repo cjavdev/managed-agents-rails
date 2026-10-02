@@ -1,0 +1,18 @@
+<section id="<%= dom_id(ticket, :triage) %>" class="triage">
+  <h2>Triage</h2>
+  <% if ticket.triaged? %>
+    <dl>
+      <dt>Priority</dt><dd><%= render "tickets/priority", ticket: ticket %></dd>
+      <dt>Category</dt><dd><%= ticket.category.humanize %></dd>
+      <dt>Team</dt><dd><%= ticket.team.humanize %></dd>
+      <dt>Summary</dt><dd><%= ticket.summary %></dd>
+    </dl>
+  <% else %>
+    <p class="muted">Waiting for the agent.</p>
+  <% end %>
+
+  <% if ticket.suggested_reply.present? %>
+    <h3>Suggested reply</h3>
+    <div class="reply"><%= simple_format(ticket.suggested_reply) %></div>
+  <% end %>
+</section>

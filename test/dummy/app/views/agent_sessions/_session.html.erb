@@ -1,0 +1,7 @@
+<li class="ma-session-list__item">
+  <%= link_to agent_session.title.presence || agent_session.remote_id, agent_session_path(agent_session) %>
+  <span class="ma-session-list__meta">
+    <%= agent_session.agent_name.humanize %> · <%= time_ago_in_words(agent_session.created_at) %> ago
+  </span>
+  <span class="ma-status ma-status--<%= agent_session.status.dasherize %>"><%= agent_session.status.humanize %></span>
+</li>

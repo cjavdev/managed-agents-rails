@@ -1,0 +1,9 @@
+ruby_version: 3.2
+ignore:
+  - "test/dummy/bin/**/*"
+  - "test/dummy/config/**/*"
+  - "test/dummy/db/schema.rb"
+  - "examples/**/bin/**/*"
+  - "examples/**/config/**/*"
+  - "examples/**/db/schema.rb"
+  - "tmp/**/*"

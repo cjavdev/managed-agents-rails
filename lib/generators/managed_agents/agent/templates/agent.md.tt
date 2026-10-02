@@ -1,0 +1,22 @@
+---
+name: <%= file_name.humanize %>
+description: What this agent is for, in a sentence.
+model: <%= options[:model] %>
+tools:
+  - type: agent_toolset_20260401
+  # Custom tools run inside this app. Declare the schema here and handle the
+  # call in app/agents/<%= file_name %>_agent.rb.
+  # - type: custom
+  #   name: find_record
+  #   description: Look up a record by its ID.
+  #   input_schema:
+  #     type: object
+  #     properties:
+  #       id: {type: integer}
+  #     required: [id]
+---
+
+You are the <%= file_name.humanize.downcase %> agent.
+
+Describe the job here: what the agent is responsible for, what it can touch,
+and what a good result looks like.

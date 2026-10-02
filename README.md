@@ -1,0 +1,300 @@
+# managed_agents
+
+[Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) for Rails.
+
+Define agents as files under `app/agents`, sync them to the Claude API the way you run migrations,
+keep the remote IDs in your database, start sessions from your app, answer the agent's custom tools
+in Ruby, and generate a chat UI.
+
+```ruby
+class SupportTriageAgent < ApplicationAgent
+  tool :set_priority do |input|
+    subject.update!(priority: input[:priority])
+    {ok: true}
+  end
+end
+
+SupportTriageAgent.start("Triage this ticket", subject: ticket)
+```
+
+## Installation
+
+```ruby
+# Gemfile
+gem "managed_agents", github: "cjavdev/managed-agents-rails"
+```
+
+```sh
+bundle install
+bin/rails generate managed_agents:install
+bin/rails db:migrate
+```
+
+The install generator adds an initializer, a migration, `app/agents/application_agent.rb` and mounts
+the engine at `/managed_agents` (for webhooks).
+
+Requires Ruby 3.2+, Rails 7.2+ and the `anthropic` gem 1.72+.
+
+### Credentials
+
+The API key is read from `ENV["ANTHROPIC_API_KEY"]`, then from `credentials.anthropic.api_key`. With
+neither set, the SDK falls back to an `ant auth login` profile or workload identity federation.
+
+## Quick start
+
+```sh
+bin/rails managed_agents:create --name assistant   # scaffold app/agents/assistant/
+bin/rails managed_agents:sync                      # create it in your workspace
+bin/rails generate managed_agents:chat             # optional chat UI at /agent_sessions
+```
+
+## Defining agents
+
+Each agent is a folder. The file names are the same ones `ant apply` recognises.
+
+```
+app/agents/
+  application_agent.rb
+  support_triage_agent.rb          # optional: tool handlers and callbacks
+  support_triage/
+    agent.md                       # frontmatter = the agent, body = its system prompt
+    environment.yaml               # the container sessions run in
+    vault.yaml                     # credentials (optional)
+    deployment-daily.yaml          # a scheduled run (optional, any number)
+    deployment-hourly-title.yaml
+```
+
+```markdown
+---
+name: Support triage
+model: claude-opus-5-5
+tools:
+  - type: agent_toolset_20260401
+  - type: custom
+    name: set_priority
+    description: Set the priority of the ticket being triaged.
+    input_schema:
+      type: object
+      properties:
+        priority: {type: string, enum: [low, normal, high]}
+      required: [priority]
+---
+
+You triage support tickets. Read the ticket and call set_priority once.
+```
+
+- Every file is rendered through ERB before it is parsed, like `database.yml`. Use it for anything
+  that differs per environment: `name: myapp-triage-<%= Rails.env %>`.
+- Files refer to each other by relative path: `agent: ./agent.md`,
+  `environment_id: ./environment.yaml`, `vault_ids: [./vault.yaml]`.
+- A deployment can be YAML with `initial_events`, or Markdown whose body is the kickoff message.
+
+Scaffold one with either command:
+
+```sh
+bin/rails managed_agents:create --name support_triage --deployments daily --vault
+bin/rails generate managed_agents:agent support_triage --deployments daily --vault
+```
+
+## Syncing
+
+```sh
+bin/rails managed_agents:sync            # create or update whatever changed
+bin/rails managed_agents:sync --dry-run  # show the plan only
+bin/rails managed_agents:status          # synced / pending / not synced / orphaned
+bin/rails managed_agents:check           # validate files and tool handlers, no API calls
+```
+
+Run `managed_agents:sync` on every deploy, next to `db:migrate`. Remote IDs are stored in the
+`managed_agents_resources` table, so each database tracks the workspace it was synced against:
+development and production never share IDs, and nothing needs to be committed.
+
+| Flag | Effect |
+| --- | --- |
+| `--only NAME` | Sync one agent folder |
+| `--backend ant\|api` | Choose how to apply (default: `auto`) |
+| `--force` | Overwrite a resource that was changed outside the files |
+| `--prune` | Archive remote resources whose files were deleted |
+| `--adopt` | Take over an existing environment or credential with the same name |
+
+### Backends
+
+- **ant**: used when the [`ant` CLI](https://platform.claude.com/docs/en/cli-sdks-libraries/cli/apply)
+  1.34+ is on `PATH`. The rendered files and a lockfile rebuilt from the database go into
+  `tmp/managed_agents/build`, `ant apply` runs there, and the lockfile is read back into the
+  database. No `claude-lock.json` is committed.
+- **api**: used otherwise (most production containers). Resources are created and updated through
+  the SDK, and only when the digest of their request body changed.
+
+Whichever backend created a database's rows keeps being used. Moving from `ant` to `api` works;
+moving from `api` to `ant` is refused, because `ant apply` cannot adopt resources it did not create
+and would make duplicates.
+
+Set `ANTHROPIC_WORKSPACE_ID` (or `config.workspace_id`) and a sync refuses to run against a database
+that holds IDs from a different workspace.
+
+## Vault credentials from Rails credentials
+
+```yaml
+# app/agents/support_triage/vault.yaml
+display_name: support-triage
+credentials:
+  - display_name: Linear MCP
+    auth:
+      type: static_bearer
+      mcp_server_url: https://mcp.linear.app/mcp
+      token: {credential: linear.mcp_token}
+  - display_name: Stripe key
+    auth:
+      type: environment_variable
+      secret_name: STRIPE_API_KEY
+      secret_value: {env: STRIPE_SECRET_KEY}
+      networking: {type: limited, allowed_hosts: [api.stripe.com]}
+```
+
+- `{credential: "linear.mcp_token"}` reads `ENV["LINEAR_MCP_TOKEN"]`, then
+  `credentials.dig(Rails.env, :linear, :mcp_token)`, then `credentials.dig(:linear, :mcp_token)`.
+- `{env: "NAME"}` reads the environment only.
+- A literal value in `token`, `access_token`, `refresh_token`, `client_secret` or `secret_value` is
+  rejected, so a secret can't be committed by accident.
+- Rotating the secret and syncing again updates the credential in place. Only a keyed digest of the
+  secret is stored locally.
+
+The agent's vault is attached to every session it starts.
+
+## Running sessions
+
+```ruby
+session = SupportTriageAgent.start("Triage this ticket",
+  subject: ticket,          # any record; available to tool handlers as `subject`
+  title: "Ticket #42",
+  max_cost: 2.00)           # hard spend cap in dollars
+
+session.send_message("Also check the billing history")
+session.interrupt!
+session.last_agent_message
+session.console_url
+```
+
+`start` creates the session, stores a `ManagedAgents::Session` and enqueues
+`ManagedAgents::SessionJob`, which holds the event stream until the agent's turn ends. Every event
+is stored in `managed_agents_events`.
+
+```ruby
+class Ticket < ApplicationRecord
+  has_agent_sessions   # ticket.agent_sessions
+end
+```
+
+An agent with no Ruby class still works: `ManagedAgents.agent("assistant").start("Hello")`.
+
+### Custom tools
+
+Declare the tool's schema in `agent.md` and handle it in the agent class. The block runs in your
+app with `session` and `subject` available; its return value is what the agent reads.
+
+```ruby
+class SupportTriageAgent < ApplicationAgent
+  tool :set_priority do |input|
+    raise ManagedAgents::ToolError, "Ticket is closed" if subject.closed?
+
+    subject.update!(priority: input[:priority])
+    {ok: true}
+  end
+
+  after_turn { subject.update!(summary: session.last_agent_message) }
+  on_error { |event| Rails.logger.warn(event.error_message) }
+end
+```
+
+- Input is checked against the `input_schema` before the handler runs.
+- `ToolError` and unexpected exceptions are returned to the agent as error results; unexpected ones
+  are also reported through `Rails.error`.
+- A tool call is answered once per call ID, including after a crash and replay. Handlers can still
+  run twice if the process dies between running the handler and sending the result, so keep them
+  idempotent.
+
+### Scheduled deployments
+
+Deployments run on Anthropic's side. To let those sessions use your custom tools, either register a
+webhook (below) or schedule `ManagedAgents::DeploymentRunsJob` every few minutes. Both give each
+fired session a local record and a runner. `SupportTriageAgent.run_deployment(:daily)` fires one now.
+
+### Webhooks
+
+Register `https://your-app/managed_agents/webhooks` in the Console and set the signing secret as
+`ANTHROPIC_WEBHOOK_SIGNING_KEY`, `credentials.anthropic.webhook_secret` or `config.webhook_secret`.
+Deliveries are verified, then handled in a job. Subscribe to the rest yourself:
+
+```ruby
+ActiveSupport::Notifications.subscribe("webhook.managed_agents") do |event|
+  event.payload # => {type: "vault_credential.refresh_failed", id: "vcrd_..."}
+end
+```
+
+### Queues
+
+A `SessionJob` lasts as long as the agent's turn. Give it a queue with spare threads
+(`config.queue = :agents`).
+
+## Chat UI
+
+```sh
+bin/rails generate managed_agents:chat
+```
+
+Generates `AgentSessionsController` (plus nested controllers for messages, tool approvals and
+interrupt), views, a Stimulus controller and a plain-CSS stylesheet. The code is yours to change.
+**Add authentication before deploying it**: the generated controller has a marked spot.
+
+The transcript shows messages, tool calls with their input and results, approval prompts for tools
+with an `always_ask` policy, and streams assistant text while it is written. Live updates use Turbo
+Streams over Action Cable and need `turbo-rails`.
+
+`bin/rails generate managed_agents:views` copies the event partials into your app.
+
+## Testing your agents
+
+```ruby
+require "managed_agents/testing"
+
+class SupportTriageAgentTest < ActiveSupport::TestCase
+  include ManagedAgents::Testing::Helper
+
+  test "sets the priority the agent asks for" do
+    sync_agents
+    anthropic.respond_with custom_tool_use("set_priority", priority: "high"), agent_message("Done."), idle
+
+    session = SupportTriageAgent.start("Triage", subject: tickets(:refund), run: false)
+    session.run_now
+
+    assert_equal "high", tickets(:refund).reload.priority
+    assert_equal false, anthropic.tool_results.sole[:is_error]
+  end
+end
+```
+
+The helper swaps in an in-memory client for each test. `anthropic.calls` records what was sent.
+
+## Example apps
+
+- [`examples/kanban`](examples/kanban): a small Trello-style board with an assistant that creates
+  and moves cards.
+- [`examples/helpdesk`](examples/helpdesk): support tickets triaged by an agent when they arrive,
+  with a daily digest deployment.
+
+## Not covered yet
+
+Skills and memory stores as files, multiagent rosters, MCP OAuth login flows, per-user vaults,
+outcomes, and self-hosted sandboxes.
+
+## Development
+
+```sh
+bin/rails test          # tests run against test/dummy
+bundle exec standardrb
+```
+
+## License
+
+MIT.

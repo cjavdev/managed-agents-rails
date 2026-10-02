@@ -1,0 +1,13 @@
+<% case event.event_type %>
+<% when "session.status_terminated" %>
+  <p class="ma-note">Session ended.</p>
+<% else %>
+  <% case event.stop_reason %>
+  <% when "requires_action" %>
+    <p class="ma-note">Waiting for a tool result or approval.</p>
+  <% when "budget_reached" %>
+    <p class="ma-note ma-note--error">Paused: the session reached its spend limit.</p>
+  <% when "retries_exhausted" %>
+    <p class="ma-note ma-note--error">The agent stopped after repeated errors.</p>
+  <% end %>
+<% end %>

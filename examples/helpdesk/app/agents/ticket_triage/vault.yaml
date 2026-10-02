@@ -1,0 +1,16 @@
+# Credentials the agent can use without ever seeing them. This agent needs
+# none; the entries below show the shape. Secrets are read from Rails
+# credentials (or ENV) when you run `bin/rails managed_agents:sync`.
+#
+#   {credential: "statuspage.api_key"}  ENV["STATUSPAGE_API_KEY"], then credentials.statuspage.api_key
+#   {env: "STATUSPAGE_API_KEY"}         ENV only
+display_name: helpdesk-ticket-triage-<%= Rails.env %>
+credentials: []
+  # - display_name: Statuspage API key
+  #   auth:
+  #     type: environment_variable
+  #     secret_name: STATUSPAGE_API_KEY
+  #     secret_value: {credential: statuspage.api_key}
+  #     networking:
+  #       type: limited
+  #       allowed_hosts: [api.statuspage.io]

@@ -1,0 +1,7 @@
+<details class="ma-tool ma-tool--result <%= "ma-tool--error" if event.error? %>">
+  <summary>
+    <span class="ma-tool__label"><%= event.error? ? "Tool error" : "Tool result" %></span>
+    <span class="ma-tool__meta"><%= truncate(event.text.to_s.squish, length: 80) %></span>
+  </summary>
+  <pre class="ma-code"><%= event.text %></pre>
+</details>

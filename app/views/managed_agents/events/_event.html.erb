@@ -1,0 +1,7 @@
+<%# One session event. Copy these partials into your app with
+    `bin/rails g managed_agents:views` to change how events look. %>
+<% if event.visible? %>
+  <div id="<%= event.dom_id %>" class="ma-event ma-event--<%= event.partial_name.dasherize %>">
+    <%= render "managed_agents/events/#{event.partial_name}", event: event %>
+  </div>
+<% end %>

@@ -1,0 +1,6 @@
+# This agent only uses custom tools, so its container needs no network access.
+name: kanban-board-assistant-<%= Rails.env %>
+config:
+  type: cloud
+  networking:
+    type: limited

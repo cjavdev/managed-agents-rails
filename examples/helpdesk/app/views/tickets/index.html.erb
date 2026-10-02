@@ -1,0 +1,37 @@
+<main class="page ma-page">
+  <header class="page__header">
+    <h1>Inbox</h1>
+    <%= link_to "New ticket", new_ticket_path, class: "ma-button" %>
+  </header>
+
+  <% if alert.present? %>
+    <p class="ma-note ma-note--error"><%= alert %></p>
+  <% end %>
+
+  <section class="digest">
+    <header>
+      <h2>Daily digest</h2>
+      <%= button_to "Write it now", digest_path, class: "ma-button ma-button--quiet" %>
+    </header>
+    <% if @digest %>
+      <%= simple_format(@digest.body) %>
+      <p class="muted">Written <%= time_ago_in_words(@digest.created_at) %> ago</p>
+    <% else %>
+      <p class="muted">No digest yet. It is written every weekday morning by the daily deployment.</p>
+    <% end %>
+  </section>
+
+  <% if @tickets.any? %>
+    <ul class="tickets">
+      <% @tickets.each do |ticket| %>
+        <li>
+          <%= render "tickets/priority", ticket: ticket %>
+          <%= link_to ticket.subject, ticket %>
+          <span class="muted"><%= [ticket.team, ticket.customer_email].compact.join(" · ") %></span>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="muted">No open tickets.</p>
+  <% end %>
+</main>

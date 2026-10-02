@@ -1,0 +1,42 @@
+/* The helpdesk. Colours come from the custom properties in managed_agents.css. */
+body { margin: 0; }
+
+.muted { color: var(--ma-muted); font-size: 0.875rem; font-weight: 400; }
+.page h1 { margin: 0; font-size: 1.5rem; }
+.page h2 { margin: 0; font-size: 1.0625rem; }
+.page h3 { margin: 1rem 0 0.25rem; font-size: 0.9375rem; }
+.page__header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+
+.digest, .triage, .ticket-body, .activity { margin-bottom: 1.5rem; padding: 1rem; border: 1px solid var(--ma-line); border-radius: 0.75rem; }
+.digest header, .activity header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.digest header h2, .activity header h2 { flex: 1; }
+.ticket-body { background: var(--ma-surface); border-color: transparent; }
+.ticket-body > :first-child, .reply > :first-child { margin-top: 0; }
+.ticket-body > :last-child, .reply > :last-child { margin-bottom: 0; }
+
+.tickets { margin: 0; padding: 0; list-style: none; }
+.tickets li { display: flex; align-items: baseline; gap: 0.75rem; padding: 0.625rem 0; border-top: 1px solid var(--ma-line); }
+.tickets a { flex: 1; }
+
+.priority { display: inline-block; min-width: 4.5rem; padding: 0.125rem 0.5rem; border: 1px solid var(--ma-line); border-radius: 1rem; color: var(--ma-muted); font-size: 0.75rem; text-align: center; }
+.priority--urgent, .priority--high { border-color: var(--ma-error); color: var(--ma-error); }
+.priority--urgent { background: var(--ma-error); color: var(--ma-accent-text); }
+
+.triage dl { display: grid; grid-template-columns: 6rem 1fr; gap: 0.375rem 1rem; margin: 0.75rem 0 0; }
+.triage dt { color: var(--ma-muted); font-size: 0.875rem; }
+.triage dd { margin: 0; }
+.reply { padding: 0.75rem; border-radius: 0.5rem; background: var(--ma-surface); }
+
+.activity .ma-events { max-height: 28rem; }
+
+.ticket-form { display: flex; flex-direction: column; gap: 0.375rem; }
+.ticket-form label { margin-top: 0.5rem; font-size: 0.875rem; }
+.ticket-form input[type="text"], .ticket-form input[type="email"], .ticket-form textarea {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--ma-line);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.ticket-form input[type="submit"] { align-self: flex-start; margin-top: 1rem; }

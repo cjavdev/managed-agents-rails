@@ -1,0 +1,14 @@
+<main class="page">
+  <h1>Boards</h1>
+
+  <ul class="board-list">
+    <% @boards.each do |board| %>
+      <li><%= link_to board.name, board %> <span class="muted"><%= pluralize(board.cards.count, "card") %></span></li>
+    <% end %>
+  </ul>
+
+  <%= form_with model: Board.new, class: "inline-form" do |form| %>
+    <%= form.text_field :name, placeholder: "New board name", required: true, aria: {label: "Board name"} %>
+    <%= form.submit "Create board", class: "ma-button" %>
+  <% end %>
+</main>

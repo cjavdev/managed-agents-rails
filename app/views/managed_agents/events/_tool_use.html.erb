@@ -1,0 +1,21 @@
+<details class="ma-tool">
+  <summary>
+    <span class="ma-tool__label">Tool</span>
+    <code><%= event.tool_name %></code>
+    <% if event.payload["mcp_server_name"].present? %>
+      <span class="ma-tool__meta">via <%= event.payload["mcp_server_name"] %></span>
+    <% end %>
+    <% if event.payload["evaluated_permission"] == "deny" %>
+      <span class="ma-tool__meta ma-tool__meta--error">denied</span>
+    <% end %>
+  </summary>
+  <pre class="ma-code"><%= JSON.pretty_generate(event.tool_input) %></pre>
+</details>
+
+<% if event.awaiting_confirmation? && respond_to?(:agent_session_confirmations_path) %>
+  <div class="ma-confirm">
+    <span>Allow this tool call?</span>
+    <%= button_to "Allow", agent_session_confirmations_path(event.session), params: {event_id: event.id, result: "allow"}, class: "ma-button" %>
+    <%= button_to "Deny", agent_session_confirmations_path(event.session), params: {event_id: event.id, result: "deny"}, class: "ma-button ma-button--quiet" %>
+  </div>
+<% end %>

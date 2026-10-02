@@ -1,0 +1,25 @@
+<div class="ma-page">
+  <header class="ma-header">
+    <h1>Agent sessions</h1>
+  </header>
+
+  <% if alert.present? %>
+    <p class="ma-note ma-note--error"><%= alert %></p>
+  <% end %>
+
+  <%= form_with url: agent_sessions_path, class: "ma-new-session" do |form| %>
+    <%= form.label :agent, "Agent" %>
+    <%= form.select :agent, @agents.map { |agent| [agent.name.humanize, agent.name] } %>
+    <%= form.label :message, "First message" %>
+    <%= form.text_area :message, rows: 3, placeholder: "What should the agent do?" %>
+    <%= form.submit "Start session", class: "ma-button" %>
+  <% end %>
+
+  <% if @sessions.any? %>
+    <ul class="ma-session-list">
+      <%= render partial: "agent_sessions/session", collection: @sessions, as: :agent_session %>
+    </ul>
+  <% else %>
+    <p class="ma-note">No sessions yet.</p>
+  <% end %>
+</div>

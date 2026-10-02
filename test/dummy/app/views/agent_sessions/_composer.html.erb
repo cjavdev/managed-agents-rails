@@ -1,0 +1,7 @@
+<%= form_with url: agent_session_messages_path(agent_session), class: "ma-composer",
+      data: {agent_chat_target: "form", action: "turbo:submit-end->agent-chat#reset"} do |form| %>
+  <%= form.text_area :message, rows: 2, required: true, placeholder: "Message the agent",
+        disabled: agent_session.terminated?,
+        data: {agent_chat_target: "input", action: "keydown->agent-chat#submitOnEnter"} %>
+  <%= form.submit "Send", class: "ma-button", disabled: agent_session.terminated? %>
+<% end %>

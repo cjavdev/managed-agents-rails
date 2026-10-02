@@ -1,0 +1,53 @@
+class CreateManagedAgentsTables < ActiveRecord::Migration<%= migration_version %>
+  def change
+    create_table :managed_agents_resources<%= primary_key_type %> do |t|
+      t.string :agent_name, null: false
+      t.string :kind, null: false
+      t.string :key, null: false, default: ""
+      t.string :path
+      t.string :remote_id, null: false
+      t.string :remote_version
+      t.string :digest
+      t.string :backend
+      t.<%= json_type %> :lock_data
+      t.string :workspace_id
+      t.datetime :synced_at
+      t.timestamps
+
+      t.index [:agent_name, :kind, :key], unique: true
+      t.index :remote_id, unique: true
+    end
+
+    create_table :managed_agents_sessions<%= primary_key_type %> do |t|
+      t.string :remote_id, null: false
+      t.string :agent_name, null: false
+      t.integer :agent_version
+      t.references :subject, polymorphic: true<%= foreign_key_type %>
+      t.string :title
+      t.string :status, null: false, default: "idle"
+      t.string :stop_reason
+      t.string :deployment_key
+      t.<%= json_type %> :metadata
+      t.<%= json_type %> :usage
+      t.string :lease_token
+      t.datetime :lease_expires_at
+      t.datetime :archived_at
+      t.timestamps
+
+      t.index :remote_id, unique: true
+      t.index [:agent_name, :created_at]
+    end
+
+    create_table :managed_agents_events<%= primary_key_type %> do |t|
+      t.references :session, null: false, foreign_key: {to_table: :managed_agents_sessions}<%= foreign_key_type %>
+      t.string :remote_id, null: false
+      t.string :event_type, null: false
+      t.<%= json_type %> :payload
+      t.datetime :processed_at
+      t.datetime :created_at, null: false
+
+      t.index :remote_id, unique: true
+      t.index [:session_id, :event_type]
+    end
+  end
+end

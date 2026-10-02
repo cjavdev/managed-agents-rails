@@ -1,0 +1,7 @@
+<div class="ma-bubble ma-bubble--agent">
+  <% if ManagedAgents.config.markdown %>
+    <%= ManagedAgents.config.markdown.call(event.text.to_s).html_safe %>
+  <% else %>
+    <%= simple_format(event.text) %>
+  <% end %>
+</div>

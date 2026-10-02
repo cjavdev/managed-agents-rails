@@ -1,0 +1,10 @@
+
+managed_agents is installed.
+
+  1. bin/rails db:migrate
+  2. bin/rails managed_agents:create --name assistant
+  3. bin/rails managed_agents:sync
+  4. bin/rails generate managed_agents:chat    (optional chat UI)
+
+Run `bin/rails managed_agents:sync` on every deploy, next to db:migrate.
+

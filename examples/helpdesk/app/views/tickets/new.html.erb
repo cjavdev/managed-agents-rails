@@ -1,0 +1,23 @@
+<main class="page ma-page">
+  <header class="page__header">
+    <h1>New ticket</h1>
+    <%= link_to "Inbox", tickets_path, class: "muted" %>
+  </header>
+
+  <%= form_with model: @ticket, class: "ticket-form" do |form| %>
+    <% if @ticket.errors.any? %>
+      <p class="ma-note ma-note--error"><%= @ticket.errors.full_messages.to_sentence %></p>
+    <% end %>
+
+    <%= form.label :customer_email, "Customer email" %>
+    <%= form.email_field :customer_email, required: true %>
+
+    <%= form.label :subject %>
+    <%= form.text_field :subject, required: true %>
+
+    <%= form.label :body, "Message" %>
+    <%= form.text_area :body, rows: 8, required: true %>
+
+    <%= form.submit "Create and triage", class: "ma-button" %>
+  <% end %>
+</main>

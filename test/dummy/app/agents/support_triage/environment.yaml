@@ -1,0 +1,5 @@
+name: dummy-support-triage-<%= Rails.env %>
+config:
+  type: cloud
+  networking:
+    type: limited

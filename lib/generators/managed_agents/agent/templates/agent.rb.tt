@@ -1,0 +1,15 @@
+# Ruby side of app/agents/<%= file_name %>/.
+#
+#   <%= agent_class_name %>.start("Hello", subject: record)
+class <%= agent_class_name %> < <%= parent_class_name %>
+  # Handle a custom tool declared in agent.md. `session` and `subject` are
+  # available, and the return value is what the agent reads.
+  #
+  # tool :find_record do |input|
+  #   Record.find(input[:id]).as_json
+  # end
+
+  # after_turn do
+  #   subject.update!(summary: session.last_agent_message)
+  # end
+end

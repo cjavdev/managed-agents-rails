@@ -1,0 +1,7 @@
+<%# Assistant text that is still being written. Replaced by the full message
+    when it arrives. %>
+<% if text.present? %>
+  <div class="ma-event ma-event--agent-message">
+    <div class="ma-bubble ma-bubble--agent ma-bubble--preview"><%= simple_format(text) %></div>
+  </div>
+<% end %>

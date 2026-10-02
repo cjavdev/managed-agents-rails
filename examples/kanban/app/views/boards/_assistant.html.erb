@@ -1,0 +1,35 @@
+<%# The assistant panel reuses the engine's event partials and the Stimulus
+    controller from `managed_agents:chat`. %>
+<aside class="assistant" data-controller="agent-chat">
+  <header class="assistant__header">
+    <h2>Assistant</h2>
+    <% if agent_session %>
+      <%= render "managed_agents/sessions/status", agent_session: agent_session %>
+      <%= link_to "Transcript", agent_session_path(agent_session), class: "muted" %>
+    <% end %>
+  </header>
+
+  <% if alert.present? %>
+    <p class="ma-note ma-note--error"><%= alert %></p>
+  <% end %>
+
+  <div class="ma-events" data-agent-chat-target="scroll">
+    <% if agent_session %>
+      <%= turbo_stream_from agent_session %>
+      <div id="<%= agent_session.events_dom_id %>">
+        <%= render partial: "managed_agents/events/event", collection: agent_session.events, as: :event %>
+      </div>
+      <div id="<%= agent_session.preview_dom_id %>"></div>
+    <% else %>
+      <p class="ma-note">Ask for something like “Add cards for launching the pricing page” or “Move everything about billing to Doing”.</p>
+    <% end %>
+  </div>
+
+  <%= form_with url: board_messages_path(board), class: "ma-composer",
+        data: {agent_chat_target: "form", action: "turbo:submit-end->agent-chat#reset"} do |form| %>
+    <%= form.text_area :message, rows: 2, required: true, placeholder: "Ask the assistant",
+          aria: {label: "Message"},
+          data: {agent_chat_target: "input", action: "keydown->agent-chat#submitOnEnter"} %>
+    <%= form.submit "Send", class: "ma-button" %>
+  <% end %>
+</aside>

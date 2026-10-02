@@ -1,0 +1,17 @@
+# Runs the agent on a schedule. Each run starts a new session.
+name: <%= file_name.humanize %> <%= @deployment.humanize.downcase %>
+agent: ./agent.md
+environment_id: ./environment.yaml
+<% if options[:vault] -%>
+vault_ids:
+  - ./vault.yaml
+<% end -%>
+schedule:
+  type: cron
+  expression: "<%= schedule %>"
+  timezone: <%= time_zone %>
+initial_events:
+  - type: user.message
+    content:
+      - type: text
+        text: Describe what this run should do.

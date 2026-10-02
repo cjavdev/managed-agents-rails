@@ -1,0 +1,45 @@
+<%= turbo_stream_from @ticket %>
+
+<main class="page ma-page">
+  <header class="page__header">
+    <div>
+      <%= link_to "Inbox", tickets_path, class: "muted" %>
+      <h1><%= @ticket.subject %></h1>
+      <p class="muted"><%= @ticket.customer_email %> · <%= @ticket.created_at.to_fs(:short) %> · <%= @ticket.status %></p>
+    </div>
+    <%= button_to @ticket.open? ? "Close" : "Reopen", ticket_path(@ticket), method: :patch,
+          params: {ticket: {status: @ticket.open? ? "closed" : "open"}}, class: "ma-button ma-button--quiet" %>
+  </header>
+
+  <% if alert.present? %>
+    <p class="ma-note ma-note--error"><%= alert %></p>
+  <% end %>
+
+  <section class="ticket-body"><%= simple_format(@ticket.body) %></section>
+
+  <%= render "tickets/triage", ticket: @ticket %>
+
+  <section class="activity" data-controller="agent-chat">
+    <header>
+      <h2>Agent activity</h2>
+      <% if @session %>
+        <%= render "managed_agents/sessions/status", agent_session: @session %>
+      <% end %>
+      <%= button_to "Triage again", ticket_triage_path(@ticket), class: "ma-button ma-button--quiet" %>
+    </header>
+
+    <% if @session %>
+      <%= turbo_stream_from @session %>
+      <div class="ma-events" data-agent-chat-target="scroll">
+        <div id="<%= @session.events_dom_id %>">
+          <%= render partial: "managed_agents/events/event", collection: @session.events, as: :event %>
+        </div>
+        <div id="<%= @session.preview_dom_id %>"></div>
+      </div>
+      <%# Follow-up questions go to the same session, through the generated chat controllers. %>
+      <%= render "agent_sessions/composer", agent_session: @session %>
+    <% else %>
+      <p class="muted">This ticket has not been triaged.</p>
+    <% end %>
+  </section>
+</main>

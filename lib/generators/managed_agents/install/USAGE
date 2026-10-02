@@ -1,0 +1,7 @@
+Description:
+    Installs managed_agents: an initializer, the migration for the resources,
+    sessions and events tables, app/agents/application_agent.rb, and the engine
+    mount for the webhook endpoint.
+
+Example:
+    bin/rails generate managed_agents:install

@@ -1,0 +1,14 @@
+name: Support triage daily
+agent: ./agent.md
+environment_id: ./environment.yaml
+vault_ids:
+  - ./vault.yaml
+schedule:
+  type: cron
+  expression: "0 9 * * *"
+  timezone: UTC
+initial_events:
+  - type: user.message
+    content:
+      - type: text
+        text: Triage every ticket that has no priority yet.

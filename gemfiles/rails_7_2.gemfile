@@ -1,0 +1,13 @@
+source "https://rubygems.org"
+
+gemspec path: ".."
+
+gem "rails", "~> 7.2.0"
+gem "puma"
+gem "sqlite3"
+gem "propshaft"
+gem "turbo-rails"
+gem "webmock"
+
+# These Rails versions predate Minitest 6.
+gem "minitest", "< 6"

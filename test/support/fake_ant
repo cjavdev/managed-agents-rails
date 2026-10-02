@@ -1,0 +1,53 @@
+#!/usr/bin/env ruby
+# Stands in for the ant CLI in tests. Mimics what `ant apply` does to the
+# lockfile: an entry per file, keyed by the path relative to the lockfile.
+require "json"
+require "digest"
+
+if ARGV == ["--version"]
+  puts "ant version #{ENV.fetch("FAKE_ANT_VERSION", "1.36.0")}"
+  exit
+end
+
+File.write(ENV["FAKE_ANT_LOG"], JSON.generate(argv: ARGV, cwd: Dir.pwd, api_key: ENV["ANTHROPIC_API_KEY"]) + "\n", mode: "a") if ENV["FAKE_ANT_LOG"]
+
+abort "unknown command" unless ARGV.shift == "apply"
+
+dry_run = !ARGV.delete("--dry-run").nil?
+ARGV.delete("--yes")
+ARGV.delete("--verbose")
+ARGV.delete("--force")
+lock_path = ARGV.delete_at(ARGV.index("--lock-file") + 1)
+ARGV.delete("--lock-file")
+
+lock = File.exist?(lock_path) ? JSON.parse(File.read(lock_path)) : {"version" => 1, "resources" => {}}
+lock["origin"] ||= {"base_url" => "https://api.anthropic.com", "organization_id" => "org-fake", "workspace_id" => ENV.fetch("FAKE_ANT_WORKSPACE", "wrkspc_fake")}
+fail_at = ENV["FAKE_ANT_FAIL_ON"]
+
+ARGV.each_with_index do |file, index|
+  key = "./#{file}"
+  kind = File.basename(file)[/\A(agent|environment|deployment)/, 1]
+  hash = Digest::MD5.hexdigest(File.read(file))
+  entry = lock["resources"][key]
+
+  if fail_at && file.include?(fail_at)
+    File.write(lock_path, JSON.pretty_generate(lock)) unless dry_run
+    warn "error: could not apply #{key}"
+    exit 1
+  end
+
+  if entry.nil?
+    puts "+ #{key}  create"
+    entry = {"kind" => kind, "id" => "#{kind[0, 5]}_ant#{lock["resources"].size + 1}", "hash" => hash, "remote_hash" => hash}
+    entry["version"] = "1" if kind == "agent"
+  elsif entry["hash"] != hash
+    puts "~ #{key}  update"
+    entry = entry.merge("hash" => hash, "remote_hash" => hash)
+    entry["version"] = (entry["version"].to_i + 1).to_s if kind == "agent"
+  else
+    puts "= #{key}  unchanged"
+  end
+  lock["resources"][key] = entry unless dry_run
+end
+
+File.write(lock_path, JSON.pretty_generate(lock)) unless dry_run

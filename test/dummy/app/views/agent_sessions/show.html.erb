@@ -1,0 +1,28 @@
+<%= turbo_stream_from @session if respond_to?(:turbo_stream_from) %>
+
+<div class="ma-page ma-chat" data-controller="agent-chat">
+  <header class="ma-header">
+    <div>
+      <%= link_to "Sessions", agent_sessions_path, class: "ma-back" %>
+      <h1><%= @session.title.presence || @session.agent_name.humanize %></h1>
+    </div>
+    <div class="ma-header__actions">
+      <%= render "managed_agents/sessions/status", agent_session: @session %>
+      <%= link_to "Open in Console", @session.console_url, target: "_blank", rel: "noopener", class: "ma-link" %>
+      <%= button_to "Stop", agent_session_interrupt_path(@session), class: "ma-button ma-button--quiet" %>
+    </div>
+  </header>
+
+  <% if alert.present? %>
+    <p class="ma-note ma-note--error"><%= alert %></p>
+  <% end %>
+
+  <div class="ma-events" data-agent-chat-target="scroll">
+    <div id="<%= @session.events_dom_id %>">
+      <%= render partial: "managed_agents/events/event", collection: @events, as: :event %>
+    </div>
+    <div id="<%= @session.preview_dom_id %>"></div>
+  </div>
+
+  <%= render "agent_sessions/composer", agent_session: @session %>
+</div>

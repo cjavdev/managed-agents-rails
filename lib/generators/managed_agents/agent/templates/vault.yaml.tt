@@ -1,0 +1,21 @@
+# Credentials the agent can use without ever seeing them. Secrets are read from
+# Rails credentials (or ENV) when you run `bin/rails managed_agents:sync`.
+#
+#   {credential: "linear.mcp_token"}  ENV["LINEAR_MCP_TOKEN"], then credentials.linear.mcp_token
+#   {env: "STRIPE_SECRET_KEY"}        ENV only
+display_name: <%= app_name %>-<%= file_name.dasherize %>-<%%= Rails.env %>
+credentials: []
+  # - display_name: Linear MCP
+  #   auth:
+  #     type: static_bearer
+  #     mcp_server_url: https://mcp.linear.app/mcp
+  #     token: {credential: linear.mcp_token}
+  #
+  # - display_name: Stripe API key
+  #   auth:
+  #     type: environment_variable
+  #     secret_name: STRIPE_API_KEY
+  #     secret_value: {credential: stripe.secret_key}
+  #     networking:
+  #       type: limited
+  #       allowed_hosts: [api.stripe.com]

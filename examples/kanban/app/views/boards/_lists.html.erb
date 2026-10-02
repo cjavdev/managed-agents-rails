@@ -1,0 +1,30 @@
+<div id="board_lists" class="lists">
+  <% board.lists.includes(:cards).each do |list| %>
+    <section class="list">
+      <h2><%= list.name %> <span class="muted"><%= list.cards.size %></span></h2>
+
+      <% list.cards.each do |card| %>
+        <article class="card" id="<%= dom_id(card) %>">
+          <h3><%= card.title %></h3>
+          <% if card.description.present? %>
+            <p><%= card.description %></p>
+          <% end %>
+          <div class="card__actions">
+            <% if (previous = list.previous_list) %>
+              <%= button_to "←", card_path(card), method: :patch, params: {list_id: previous.id}, aria: {label: "Move to #{previous.name}"} %>
+            <% end %>
+            <% if (following = list.next_list) %>
+              <%= button_to "→", card_path(card), method: :patch, params: {list_id: following.id}, aria: {label: "Move to #{following.name}"} %>
+            <% end %>
+            <%= button_to "Delete", card_path(card), method: :delete, class: "card__delete" %>
+          </div>
+        </article>
+      <% end %>
+
+      <%= form_with url: list_cards_path(list), scope: :card, class: "inline-form" do |form| %>
+        <%= form.text_field :title, placeholder: "Add a card", required: true, aria: {label: "Card title for #{list.name}"} %>
+        <%= form.submit "Add", class: "ma-button ma-button--quiet" %>
+      <% end %>
+    </section>
+  <% end %>
+</div>

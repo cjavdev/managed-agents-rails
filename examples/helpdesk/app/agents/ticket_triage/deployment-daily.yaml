@@ -1,0 +1,17 @@
+# Writes the digest every weekday morning. The session is started by Anthropic;
+# this app answers its tool calls once a webhook or ManagedAgents::DeploymentRunsJob
+# picks the run up.
+name: Helpdesk daily digest (<%= Rails.env %>)
+agent: ./agent.md
+environment_id: ./environment.yaml
+vault_ids:
+  - ./vault.yaml
+schedule:
+  type: cron
+  expression: "0 8 * * 1-5"
+  timezone: UTC
+initial_events:
+  - type: user.message
+    content:
+      - type: text
+        text: Write today's digest of the open tickets.
