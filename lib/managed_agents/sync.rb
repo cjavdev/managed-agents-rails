@@ -61,17 +61,22 @@ module ManagedAgents
     end
 
     # One row per resource, for `managed_agents:status`.
-    def status
+    # `validate: true` also asks the API whether each signed-in credential still works.
+    def status(validate: false)
       rows = definitions.flat_map do |definition|
         expected(definition).map do |kind, key, path|
           resource = Resource.lookup(definition.name, kind, key)
-          state = "not synced" unless resource
+          state = connected_state(definition, key, resource, validate) if kind == "credential" && connected?(definition, key)
+          state ||= "optional, not set" if resource.nil? && kind == "credential" && optional?(definition, key)
+          state ||= "not synced" unless resource
           state ||= (resource.digest == current_digest(definition, kind, key, resource)) ? "synced" : "pending"
           [definition.name, label(kind, key), resource&.remote_id, resource&.remote_version, state]
         end
       end
       rows + orphans.map { |resource| [resource.agent_name, label(resource.kind, resource.key), resource.remote_id, resource.remote_version, "orphaned"] }
     end
+
+    STATES_OK = ["synced", "connected", "connected (unverified)", "optional, not set"].freeze
 
     def backend_name
       @backend_name ||= begin
@@ -116,6 +121,25 @@ module ManagedAgents
     def backend_for(resource)
       @backends ||= {"ant" => AntBackend.new(self), "api" => ApiBackend.new(self)}
       @backends.fetch(resource.backend || "api")
+    end
+
+    def optional?(definition, key)
+      definition.credentials.any? { |credential| Vaults.key(credential) == key && credential["optional"] }
+    end
+
+    def connected?(definition, key)
+      definition.connected_credentials.any? { |credential| Vaults.key(credential) == key }
+    end
+
+    def connected_state(definition, key, resource, validate)
+      return "not connected" unless resource
+      return "connected" unless validate
+
+      case AgentVault.new(definition.name).validate(key)
+      when "valid" then "connected"
+      when "invalid" then "invalid: reconnect"
+      else "connected (unverified)"
+      end
     end
 
     def current_digest(definition, kind, key, resource)
@@ -210,7 +234,9 @@ module ManagedAgents
 
     def report(changes)
       counts = changes.group_by(&:action).transform_values(&:size)
-      summary = %i[create update unchanged archive orphaned].filter_map { |action| "#{counts[action]} #{action}" if counts[action] }
+      summary = %i[create update unchanged archive orphaned not_connected skipped].filter_map do |action|
+        "#{counts[action]} #{action.to_s.tr("_", " ")}" if counts[action]
+      end
       io.puts "#{dry_run ? "Plan" : "Synced"} (#{backend_name} backend): #{summary.join(", ").presence || "nothing to do"}"
     end
 

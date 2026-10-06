@@ -1,6 +1,7 @@
 require "managed_agents/oauth/http"
 require "managed_agents/oauth/discovery"
 require "managed_agents/oauth/flow"
+require "managed_agents/oauth/terminal"
 
 module ManagedAgents
   # Gets a person's OAuth tokens for an MCP server and puts them in a vault.
@@ -26,8 +27,8 @@ module ManagedAgents
 
     module_function
 
-    def authorize(server_url, redirect_uri:)
-      Flow.new(server_url, redirect_uri: redirect_uri).authorization_request
+    def authorize(server_url, redirect_uri:, scope: nil)
+      Flow.new(server_url, redirect_uri: redirect_uri, scope: scope).authorization_request
     end
 
     def complete(vault, pending, params)
@@ -42,8 +43,8 @@ module ManagedAgents
 
       # Given an owner rather than a vault, the vault is only created once the
       # response has been checked.
-      vault = Vault.for(vault) unless vault.is_a?(Vault)
-      Flow.new(pending[:server_url], redirect_uri: pending[:redirect_uri])
+      vault = Vault.for(vault) unless vault.is_a?(Vault) || vault.is_a?(AgentVault)
+      Flow.new(pending[:server_url], redirect_uri: pending[:redirect_uri], scope: pending[:scope])
         .connect(vault, code: params[:code], code_verifier: pending[:code_verifier])
     end
   end

@@ -38,7 +38,9 @@ module ManagedAgents
         return [] unless definition.vault_path
 
         changes = [vault(definition)]
-        definition.credentials.each { |credential| changes << credential(definition, credential) }
+        definition.credentials.each do |credential|
+          changes << (Definition.connected_credential?(credential) ? connected(definition, credential) : credential(definition, credential))
+        end
         changes
       end
 
@@ -69,9 +71,17 @@ module ManagedAgents
         key = self.class.key(credential)
         raise DefinitionError, "#{definition.name}: a credential needs auth.mcp_server_url or auth.secret_name" if key.blank?
 
-        body = self.class.credential_body(credential)
-        digest = Digests.secret_digest(body)
         resource = Resource.lookup(definition.name, "credential", key)
+        begin
+          body = self.class.credential_body(credential)
+        rescue MissingSecret => error
+          raise unless credential["optional"]
+
+          # Left as it is: a credential already in the vault keeps working.
+          @sync.say(:skip, definition.name, "credential", key, "optional, #{error.message}")
+          return Change.new(definition.name, "credential", key, :skipped, resource&.remote_id)
+        end
+        digest = Digests.secret_digest(body)
         action = @sync.action_for(resource, digest)
 
         if action != :unchanged && !@sync.dry_run
@@ -84,6 +94,19 @@ module ManagedAgents
 
         @sync.say(action, definition.name, "credential", key, resource&.remote_id)
         Change.new(definition.name, "credential", key, action, resource&.remote_id)
+      end
+
+      # Its tokens come from `managed_agents:connect`, so sync only reports it.
+      def connected(definition, credential)
+        key = self.class.key(credential)
+        resource = Resource.lookup(definition.name, "credential", key)
+        if resource
+          @sync.say(:unchanged, definition.name, "credential", key, resource.remote_id)
+          return Change.new(definition.name, "credential", key, :unchanged, resource.remote_id)
+        end
+
+        @sync.say(:connect, definition.name, "credential", key, "run bin/rails managed_agents:connect #{definition.name} #{key}")
+        Change.new(definition.name, "credential", key, :not_connected, nil)
       end
 
       def create(vault_id, key, body)
