@@ -139,7 +139,11 @@ module ManagedAgents
         credentials.each do |credential|
           next check_connected(problems, credential) if self.class.connected_credential?(credential)
 
-          Secrets.resolve(credential.fetch("auth", {}))
+          begin
+            Secrets.resolve(credential.fetch("auth", {}))
+          rescue MissingSecret
+            raise unless credential["optional"]
+          end
         end
       end
       problems

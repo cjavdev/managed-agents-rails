@@ -157,6 +157,8 @@ credentials:
 - `{env: "NAME"}` reads the environment only.
 - A literal value in `token`, `access_token`, `refresh_token`, `client_secret` or `secret_value` is
   rejected, so a secret can't be committed by accident.
+- `optional: true` on a credential skips it, instead of failing the sync, while its secret is not
+  set. One already in the vault is left as it is.
 - Rotating the secret and syncing again updates the credential in place. Only a keyed digest of the
   secret is stored locally.
 

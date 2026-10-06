@@ -67,6 +67,7 @@ module ManagedAgents
         expected(definition).map do |kind, key, path|
           resource = Resource.lookup(definition.name, kind, key)
           state = connected_state(definition, key, resource, validate) if kind == "credential" && connected?(definition, key)
+          state ||= "optional, not set" if resource.nil? && kind == "credential" && optional?(definition, key)
           state ||= "not synced" unless resource
           state ||= (resource.digest == current_digest(definition, kind, key, resource)) ? "synced" : "pending"
           [definition.name, label(kind, key), resource&.remote_id, resource&.remote_version, state]
@@ -75,7 +76,7 @@ module ManagedAgents
       rows + orphans.map { |resource| [resource.agent_name, label(resource.kind, resource.key), resource.remote_id, resource.remote_version, "orphaned"] }
     end
 
-    STATES_OK = ["synced", "connected", "connected (unverified)"].freeze
+    STATES_OK = ["synced", "connected", "connected (unverified)", "optional, not set"].freeze
 
     def backend_name
       @backend_name ||= begin
@@ -120,6 +121,10 @@ module ManagedAgents
     def backend_for(resource)
       @backends ||= {"ant" => AntBackend.new(self), "api" => ApiBackend.new(self)}
       @backends.fetch(resource.backend || "api")
+    end
+
+    def optional?(definition, key)
+      definition.credentials.any? { |credential| Vaults.key(credential) == key && credential["optional"] }
     end
 
     def connected?(definition, key)
@@ -227,7 +232,7 @@ module ManagedAgents
 
     def report(changes)
       counts = changes.group_by(&:action).transform_values(&:size)
-      summary = %i[create update unchanged archive orphaned not_connected].filter_map do |action|
+      summary = %i[create update unchanged archive orphaned not_connected skipped].filter_map do |action|
         "#{counts[action]} #{action.to_s.tr("_", " ")}" if counts[action]
       end
       io.puts "#{dry_run ? "Plan" : "Synced"} (#{backend_name} backend): #{summary.join(", ").presence || "nothing to do"}"

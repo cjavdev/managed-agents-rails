@@ -14,3 +14,4 @@
 - Vaults owned by any record (`has_agent_vault`), combined per session with `vaults:`.
 - MCP OAuth connect flow and a `connections` generator.
 - `connect: oauth` credentials in `vault.yaml`, signed in for with `managed_agents:connect`; `status --validate`.
+- `optional: true` vault credentials are skipped while their secret is not set.
