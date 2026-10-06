@@ -28,9 +28,9 @@ module ManagedAgents
       self
     end
 
-    def interrupt!
+    def interrupt!(run: true)
       deliver({type: "user.interrupt"})
-      run_later
+      run_later if run
       self
     end
 
@@ -111,6 +111,12 @@ module ManagedAgents
       marker = last_marker
       marker&.event_type == "session.status_idle" && marker.stop_reason == "requires_action" &&
         pending_tool_uses.empty? && pending_confirmations.any?
+    end
+
+    # When the current turn began: the last message sent to the agent.
+    def turn_started_at
+      message = events.where(event_type: "user.message").last
+      message&.processed_at || message&.created_at || created_at
     end
 
     def last_agent_message

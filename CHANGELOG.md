@@ -17,3 +17,5 @@
 - `optional: true` on a vault credential skips it when its secret isn't set.
 - Multiagent rosters: `agent-<role>.md` files referenced from a coordinator's `multiagent.agents`.
 - Custom skills as `skills/<name>/` folders, uploaded and pinned by version.
+- `max_turn_duration`, `on_event`, `on_interrupt` and `archive_after_turn` on agents; `interrupt!` from callbacks.
+- `tool_use_id` in tool handlers; `validate_tool_input` to skip the schema check.
