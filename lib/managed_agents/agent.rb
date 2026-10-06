@@ -18,6 +18,17 @@ module ManagedAgents
     class_attribute :turn_callbacks, default: []
     class_attribute :error_callbacks, default: []
     class_attribute :default_vaults, default: [:agent]
+    class_attribute :event_callbacks, default: []
+    class_attribute :interrupt_callbacks, default: []
+
+    # How long one turn may run, counted from the message that started it,
+    # before the runner interrupts it. A duration, or a block evaluated on the
+    # agent instance. Nil means no limit.
+    class_attribute :max_turn_duration, default: nil
+
+    # Archive the session once its turn ends, for agents that do one job per
+    # session. An archived session holds no container and takes no messages.
+    class_attribute :archive_after_turn, default: false
 
     class << self
       attr_writer :agent_name
@@ -68,6 +79,25 @@ module ManagedAgents
       # Runs on session.error events and when the session terminates.
       def on_error(method_name = nil, &block)
         self.error_callbacks += [method_name || block]
+      end
+
+      # Runs once for every event the runner reads from the session, before it
+      # acts on it (a custom tool call is answered after these). Events the app
+      # sent itself (messages, tool results) are not passed. Narrow it with
+      # event types:
+      #
+      #   on_event("span.model_request_end") { |event| ... }
+      #
+      # Events are stored once, so a callback never sees the same event twice,
+      # even across jobs. Call `interrupt!` from one to stop the turn.
+      def on_event(*types, &block)
+        self.event_callbacks += [[types.flatten.map(&:to_s), block]]
+      end
+
+      # Runs when the runner interrupts the turn, with the reason: :deadline
+      # when max_turn_duration ran out, or whatever was passed to `interrupt!`.
+      def on_interrupt(method_name = nil, &block)
+        self.interrupt_callbacks += [method_name || block]
       end
 
       def agent_id = Resource.remote_id!(definition.name, "agent")
@@ -169,6 +199,44 @@ module ManagedAgents
 
     def errored(event)
       run_callbacks(error_callbacks, event)
+    end
+
+    def event_received(event)
+      event_callbacks.each do |types, callback|
+        next unless types.empty? || types.include?(event.event_type)
+
+        begin
+          instance_exec(event, &callback)
+        rescue => error
+          report(error, callback: "on_event")
+        end
+      end
+    end
+
+    # Stops the current turn: sends user.interrupt once and runs the
+    # on_interrupt callbacks. Returns false when the interrupt could not be
+    # sent, so a later call tries again.
+    def interrupt!(reason = :requested)
+      return true if @interrupted
+
+      session.interrupt!(run: false)
+      @interrupted = true
+      run_callbacks(interrupt_callbacks, reason)
+      true
+    rescue Anthropic::Errors::APIError => error
+      ManagedAgents.logger.warn("[managed_agents] could not interrupt #{session.remote_id}: #{error.message}")
+      false
+    end
+
+    def interrupted? = !!@interrupted
+
+    # When the current turn has to be over, or nil without a limit.
+    def turn_deadline
+      limit = max_turn_duration
+      limit = instance_exec(&limit) if limit.respond_to?(:call)
+      return unless limit
+
+      session.turn_started_at + limit
     end
 
     private
