@@ -45,6 +45,15 @@ class OptionalCredentialsTest < ActiveSupport::TestCase
     refute anthropic.calls_to(:"vcrd.create").last.key?(:optional)
   end
 
+  test "status doesn't call a credential synced when its secret can't be read" do
+    ENV["OPS_RENDER_TOKEN"] = "render"
+    sync
+    ENV.delete("OPS_RENDER_TOKEN")
+
+    rows = ManagedAgents::Sync.new(io: StringIO.new).status
+    assert_equal "pending", rows.find { |row| row[1] == "credential https://mcp.render.example/mcp" }.last
+  end
+
   test "a required credential without its secret still fails" do
     ENV.delete("OPS_GITHUB_TOKEN")
 
