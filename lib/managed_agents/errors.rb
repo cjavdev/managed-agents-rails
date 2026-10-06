@@ -22,6 +22,13 @@ module ManagedAgents
   # The remote resource changed outside of the definition files.
   class Drift < SyncError; end
 
+  # Calls to the Claude API are switched off (config.enabled).
+  class Paused < Error
+    def initialize(message = "Managed Agents are paused (ManagedAgents.config.enabled is false)")
+      super
+    end
+  end
+
   # Raise from a tool handler to return an error result to the agent.
   class ToolError < Error; end
 end
