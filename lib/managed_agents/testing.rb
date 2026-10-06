@@ -238,7 +238,8 @@ module ManagedAgents
       def create(skill_id, files:, **)
         @client.calls << [:"skill.versions.create", {id: skill_id, files: Skills.names(files)}]
         version = Record.new(id: Testing.next_id("skillver"), skill_id: skill_id, type: "skill_version")
-        @client.beta.skills.retrieve(skill_id).merge!(latest_version_id: version.id)
+        latest = {latest_version_id: version.id}
+        @client.beta.skills.retrieve(skill_id).merge!(latest)
         version
       end
     end
