@@ -15,7 +15,7 @@ module ManagedAgents
   # their credentials always go through the SDK, because `ant apply` does not
   # manage credentials.
   class Sync
-    attr_reader :dry_run, :force, :prune, :adopt, :io, :client
+    attr_reader :dry_run, :force, :prune, :adopt, :io
 
     def initialize(only: nil, backend: nil, dry_run: false, force: false, prune: false, adopt: false,
       io: $stdout, client: nil)
@@ -26,10 +26,16 @@ module ManagedAgents
       @prune = prune
       @adopt = adopt
       @io = io
-      @client = client || ManagedAgents.client
+      @client = client
+    end
+
+    # Resolved on first use, so `status` and `check` work without the API.
+    def client
+      @client ||= ManagedAgents.client
     end
 
     def apply
+      ManagedAgents.ensure_enabled! unless dry_run
       check!
       verify_workspace!
 
@@ -66,7 +72,9 @@ module ManagedAgents
         expected(definition).map do |kind, key, path|
           resource = Resource.lookup(definition.name, kind, key)
           state = "not synced" unless resource
-          state ||= (resource.digest == current_digest(definition, kind, key, resource)) ? "synced" : "pending"
+          # No current digest means its secret can't be read here, so it can't be called synced.
+          current = resource && current_digest(definition, kind, key, resource)
+          state ||= (current && resource.digest == current) ? "synced" : "pending"
           [definition.name, label(kind, key), resource&.remote_id, resource&.remote_version, state]
         end
       end
@@ -164,6 +172,7 @@ module ManagedAgents
     def expected(definition)
       rows = []
       rows << ["environment", "", definition.environment_path] unless definition.shared_environment?
+      definition.roster_paths.each { |key, path| rows << ["agent", key, path] }
       rows << ["agent", "", definition.agent_path]
       rows << ["vault", "", definition.vault_path] if definition.vault_path
       definition.credentials.each { |credential| rows << ["credential", Vaults.key(credential), definition.vault_path] }
@@ -210,7 +219,7 @@ module ManagedAgents
 
     def report(changes)
       counts = changes.group_by(&:action).transform_values(&:size)
-      summary = %i[create update unchanged archive orphaned].filter_map { |action| "#{counts[action]} #{action}" if counts[action] }
+      summary = %i[create update unchanged skipped archive orphaned].filter_map { |action| "#{counts[action]} #{action}" if counts[action] }
       io.puts "#{dry_run ? "Plan" : "Synced"} (#{backend_name} backend): #{summary.join(", ").presence || "nothing to do"}"
     end
 

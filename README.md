@@ -105,6 +105,23 @@ environment: ../analyst/environment.yaml
 Sync creates the environment once, and sessions of every agent that names it run there. The
 `environment` key is not sent as part of the agent.
 
+### Multiagent rosters
+
+A coordinator delegates to roster agents declared beside it as `agent-<role>.md`, and lists them
+by path. Roster agents are synced first and pinned by version, so editing one re-pins the
+coordinator. They run as threads of the coordinator's sessions, so they have no environment of their
+own, and their custom tools are answered by the coordinator's agent class.
+
+```markdown
+---
+name: Reply desk
+model: claude-opus-5-5
+multiagent:
+  type: coordinator
+  agents: [./agent-researcher.md, ./agent-writer.md]
+---
+```
+
 Scaffold one with either command:
 
 ```sh
@@ -171,6 +188,8 @@ credentials:
 - `{credential: "linear.mcp_token"}` reads `ENV["LINEAR_MCP_TOKEN"]`, then
   `credentials.dig(Rails.env, :linear, :mcp_token)`, then `credentials.dig(:linear, :mcp_token)`.
 - `{env: "NAME"}` reads the environment only.
+- Mark a credential `optional: true` when some environments don't have its secret: there it is
+  skipped with a warning instead of failing the sync.
 - A literal value in `token`, `access_token`, `refresh_token`, `client_secret` or `secret_value` is
   rejected, so a secret can't be committed by accident.
 - Rotating the secret and syncing again updates the credential in place. Only a keyed digest of the
@@ -403,6 +422,19 @@ ActiveSupport::Notifications.subscribe("webhook.managed_agents") do |event|
 end
 ```
 
+### Pausing every API call
+
+```ruby
+# config/initializers/managed_agents.rb
+ManagedAgents.configure do |config|
+  config.enabled = -> { ENV["MANAGED_AGENTS_ENABLED"] == "true" }
+end
+```
+
+While `enabled` is false, `ManagedAgents.client` raises `ManagedAgents::Paused`, the engine's jobs
+finish without calling the API, webhook deliveries are acknowledged and dropped, and `sync` refuses to
+run (`status`, `check` and `--dry-run` still work). A callable is checked on every call.
+
 ### Queues
 
 A `SessionJob` lasts as long as the agent's turn. Give it a queue with spare threads
@@ -458,7 +490,7 @@ The helper swaps in an in-memory client for each test. `anthropic.calls` records
 
 ## Not covered yet
 
-Skills and memory stores as files, multiagent rosters, per-tenant agent definitions or overrides,
+Skills and memory stores as files, per-tenant agent definitions or overrides,
 outcomes, and self-hosted sandboxes.
 
 ## Development

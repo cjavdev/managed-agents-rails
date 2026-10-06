@@ -31,7 +31,6 @@ module ManagedAgents
 
       def initialize(sync)
         @sync = sync
-        @client = sync.client
       end
 
       def apply(definition)
@@ -52,9 +51,9 @@ module ManagedAgents
 
         if action != :unchanged && !@sync.dry_run
           remote = if resource
-            @client.beta.vaults.update(resource.remote_id, **body.deep_symbolize_keys)
+            @sync.client.beta.vaults.update(resource.remote_id, **body.deep_symbolize_keys)
           else
-            @client.beta.vaults.create(**body.deep_symbolize_keys)
+            @sync.client.beta.vaults.create(**body.deep_symbolize_keys)
           end
           resource = Resource.record!(agent_name: definition.name, kind: "vault", remote_id: remote.id,
             digest: digest, backend: "api", path: definition.relative_path(definition.vault_path),
@@ -69,7 +68,17 @@ module ManagedAgents
         key = self.class.key(credential)
         raise DefinitionError, "#{definition.name}: a credential needs auth.mcp_server_url or auth.secret_name" if key.blank?
 
-        body = self.class.credential_body(credential)
+        body = begin
+          self.class.credential_body(credential)
+        rescue MissingSecret => error
+          raise unless credential["optional"]
+
+          # An optional credential whose secret this environment doesn't have
+          # is left as it is, so one missing token doesn't stop the sync.
+          resource = Resource.lookup(definition.name, "credential", key)
+          @sync.say(:skipped, definition.name, "credential", key, error.message)
+          return Change.new(definition.name, "credential", key, :skipped, resource&.remote_id)
+        end
         digest = Digests.secret_digest(body)
         resource = Resource.lookup(definition.name, "credential", key)
         action = @sync.action_for(resource, digest)
@@ -87,19 +96,19 @@ module ManagedAgents
       end
 
       def create(vault_id, key, body)
-        @client.beta.vaults.credentials.create(vault_id, **body.deep_symbolize_keys)
+        @sync.client.beta.vaults.credentials.create(vault_id, **body.deep_symbolize_keys)
       rescue Anthropic::Errors::ConflictError
         raise SyncError, "A credential for #{key} already exists in #{vault_id}. Re-run with --adopt to take it over." unless @sync.adopt
 
-        existing = @client.beta.vaults.credentials.list(vault_id).to_enum(:auto_paging_each).find do |candidate|
+        existing = @sync.client.beta.vaults.credentials.list(vault_id).to_enum(:auto_paging_each).find do |candidate|
           candidate.archived_at.nil? && self.class.key("auth" => Events.to_hash(candidate.auth)) == key
         end
         raise SyncError, "Could not find the existing credential for #{key} in #{vault_id}" unless existing
-        @client.beta.vaults.credentials.update(existing.id, vault_id: vault_id, **mutable(body).deep_symbolize_keys)
+        @sync.client.beta.vaults.credentials.update(existing.id, vault_id: vault_id, **mutable(body).deep_symbolize_keys)
       end
 
       def update(resource, vault_id, body)
-        @client.beta.vaults.credentials.update(resource.remote_id, vault_id: vault_id, **mutable(body).deep_symbolize_keys)
+        @sync.client.beta.vaults.credentials.update(resource.remote_id, vault_id: vault_id, **mutable(body).deep_symbolize_keys)
       end
 
       def mutable(body)
