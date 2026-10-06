@@ -143,7 +143,7 @@ module ManagedAgents
     end
 
     def answer(event)
-      result = agent.call_tool(event.tool_name, event.tool_input)
+      result = agent.call_tool(event.tool_name, event.tool_input, tool_use_id: event.remote_id)
       response = @client.beta.sessions.events.send_(session.remote_id,
         events: [Events.custom_tool_result(event.remote_id, result)])
       Array(response.try(:data)).each { |sent| session.record(sent) }

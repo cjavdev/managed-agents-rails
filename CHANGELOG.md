@@ -15,3 +15,4 @@
 - MCP OAuth connect flow and a `connections` generator.
 - Agents can share another agent's environment with `environment: ../other/environment.yaml`.
 - `max_turn_duration`, `on_event`, `on_interrupt` and `archive_after_turn` on agents; `interrupt!` from callbacks.
+- `tool_use_id` in tool handlers; `validate_tool_input` to skip the schema check.
