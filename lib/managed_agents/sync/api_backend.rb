@@ -15,9 +15,10 @@ module ManagedAgents
       end
 
       def apply(definitions)
-        # Roster agents go before their coordinator, which pins their versions.
+        # Skills and roster agents go before the agents that pin their versions.
         changes = definitions.flat_map do |definition|
-          [upsert(definition, "environment"),
+          [*definition.skill_paths.keys.map { |key| upsert(definition, "skill", key) },
+            upsert(definition, "environment"),
             *definition.roster_paths.keys.map { |key| upsert(definition, "agent", key) },
             upsert(definition, "agent")]
         end
@@ -41,9 +42,14 @@ module ManagedAgents
         if action != :unchanged && !@sync.dry_run
           raise SyncError, "#{definition.name}: #{kind} #{key} refers to something that is not synced yet" if body.to_json.include?(PENDING)
 
-          remote = resource ? update(kind, resource, body) : create(kind, body)
-          resource = Resource.record!(agent_name: definition.name, kind: kind, key: key, remote_id: remote.id,
-            remote_version: remote.try(:version)&.to_s, digest: digest, backend: "api", lock_data: nil,
+          remote_id, remote_version = if kind == "skill"
+            upload_skill(definition, key, resource)
+          else
+            remote = resource ? update(kind, resource, body) : create(kind, body)
+            [remote.id, remote.try(:version)&.to_s]
+          end
+          resource = Resource.record!(agent_name: definition.name, kind: kind, key: key, remote_id: remote_id,
+            remote_version: remote_version, digest: digest, backend: "api", lock_data: nil,
             path: definition.relative_path(path(definition, kind, key)), workspace_id: @sync.workspace_id)
         end
 
@@ -80,6 +86,24 @@ module ManagedAgents
         create(kind, body)
       end
 
+      # A new skill, or a new version of it. Returns its ID and the version ID
+      # that agents pin.
+      def upload_skill(definition, key, resource)
+        files = definition.skill_files(key).map do |name, path|
+          Anthropic::FilePart.new(path.binread, filename: name, content_type: content_type(name))
+        end
+        if resource
+          [resource.remote_id, @sync.client.beta.skills.versions.create(resource.remote_id, files: files).id]
+        else
+          skill = @sync.client.beta.skills.create(display_name: key, files: files)
+          [skill.id, skill.latest_version_id]
+        end
+      end
+
+      def content_type(name)
+        (name.end_with?(".md") ? "text/markdown" : Marcel::MimeType.for(name: name)) if defined?(Marcel)
+      end
+
       def api(kind)
         @client.beta.public_send(kind.pluralize)
       end
@@ -94,6 +118,7 @@ module ManagedAgents
       def path(definition, kind, key)
         case kind
         when "environment" then definition.environment_path
+        when "skill" then definition.skill_paths.fetch(key)
         when "agent" then definition.agent_document_path(key)
         when "deployment" then definition.deployment_paths.fetch(key)
         end
@@ -102,20 +127,33 @@ module ManagedAgents
       def body(definition, kind, key)
         case kind
         when "environment" then definition.environment_body
+        when "skill" then skill_body(definition, key)
         when "agent" then agent_body(definition, key)
         when "deployment" then deployment_body(definition, key)
         end
       end
 
-      def agent_body(definition, key)
-        body = definition.agent_body(key)
-        roster = body.dig("multiagent", "agents")
-        return body unless roster.is_a?(Array)
+      # What counts as a change to a skill: its file names and contents.
+      def skill_body(definition, key)
+        {"display_name" => key, "files" => definition.skill_files(key).transform_values { |path| Digest::SHA256.file(path).hexdigest }}
+      end
 
+      def agent_body(definition, key)
+        body = definition.agent_body(key).deep_dup
         from = definition.agent_document_path(key)
-        body.deep_dup.tap do |resolved|
-          resolved["multiagent"]["agents"] = roster.map { |value| agent_reference(definition, value, from) }
-        end
+        roster = body.dig("multiagent", "agents")
+        body["multiagent"]["agents"] = roster.map { |value| agent_reference(definition, value, from) } if roster.is_a?(Array)
+        body["skills"] = body["skills"].map { |value| skill_reference(definition, value, from) } if body["skills"].is_a?(Array)
+        body
+      end
+
+      # A skill listed by path, pinned to the version that was just synced.
+      def skill_reference(definition, value, from)
+        reference = definition.resolve_reference(value, from: from)
+        return value unless reference&.kind == "skill"
+
+        resource = Resource.lookup(reference.agent_name, "skill", reference.key) or return PENDING
+        {"type" => "custom", "skill_id" => resource.remote_id, "version" => resource.remote_version}.compact
       end
 
       def deployment_body(definition, key)

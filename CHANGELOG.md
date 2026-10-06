@@ -14,3 +14,4 @@
 - Vaults owned by any record (`has_agent_vault`), combined per session with `vaults:`.
 - MCP OAuth connect flow and a `connections` generator.
 - Multiagent rosters: `agent-<role>.md` files referenced from a coordinator's `multiagent.agents`.
+- Custom skills as `skills/<name>/` folders, uploaded and pinned by version.

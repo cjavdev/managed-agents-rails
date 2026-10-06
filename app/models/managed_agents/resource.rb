@@ -2,7 +2,7 @@ module ManagedAgents
   # A remote object created from a definition file: the ID lives here, not in
   # the repo, so every database (and so every workspace) has its own.
   class Resource < ApplicationRecord
-    KINDS = %w[environment vault credential agent deployment].freeze
+    KINDS = %w[skill environment vault credential agent deployment].freeze
 
     validates :agent_name, :remote_id, presence: true
     validates :kind, inclusion: {in: KINDS}
