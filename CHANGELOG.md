@@ -14,3 +14,4 @@
 - Vaults owned by any record (`has_agent_vault`), combined per session with `vaults:`.
 - MCP OAuth connect flow and a `connections` generator.
 - Agents can share another agent's environment with `environment: ../other/environment.yaml`.
+- `config.enabled` kill switch: while off, the client raises `ManagedAgents::Paused`, engine jobs skip and webhooks are dropped.

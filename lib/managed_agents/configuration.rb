@@ -59,6 +59,12 @@ module ManagedAgents
 
     attr_accessor :logger
 
+    # A kill switch for every call to the Claude API: true, false, or a callable
+    # checked on each call, e.g. -> { ENV["MANAGED_AGENTS_ENABLED"] == "true" }.
+    # While it is off, the client raises ManagedAgents::Paused, the engine's
+    # jobs do nothing, and webhook deliveries are acknowledged and dropped.
+    attr_writer :enabled
+
     def initialize
       @agents_path = "app/agents"
       @sync_backend = :auto
@@ -71,6 +77,11 @@ module ManagedAgents
       @oauth_clients = {}
       @broadcast = true
       @stream_deltas = true
+    end
+
+    def enabled?
+      value = @enabled.respond_to?(:call) ? @enabled.call : @enabled
+      value.nil? || ActiveModel::Type::Boolean.new.cast(value) != false
     end
 
     def oauth_client_name

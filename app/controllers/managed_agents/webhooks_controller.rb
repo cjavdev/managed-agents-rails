@@ -3,6 +3,9 @@ module ManagedAgents
     HEADERS = %w[webhook-id webhook-timestamp webhook-signature].freeze
 
     def create
+      # Acknowledged so deliveries aren't retried; nothing is handled while paused.
+      return head(:no_content) unless ManagedAgents.enabled?
+
       event = ManagedAgents.client.beta.webhooks.unwrap(request.raw_post,
         headers: HEADERS.index_with { |name| request.headers[name] },
         key: ManagedAgents.config.webhook_secret)

@@ -11,7 +11,6 @@ module ManagedAgents
 
       def initialize(sync)
         @sync = sync
-        @client = sync.client
       end
 
       def apply(definitions)
@@ -78,7 +77,7 @@ module ManagedAgents
       end
 
       def api(kind)
-        @client.beta.public_send(kind.pluralize)
+        @sync.client.beta.public_send(kind.pluralize)
       end
 
       def params(kind, body)

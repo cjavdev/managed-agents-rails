@@ -33,9 +33,19 @@ module ManagedAgents
       yield config
     end
 
+    def enabled?
+      config.enabled?
+    end
+
+    def ensure_enabled!
+      raise Paused unless enabled?
+    end
+
     # One client per process. Workload identity tokens are single use, so
-    # building a client per call makes concurrent exchanges fail.
+    # building a client per call makes concurrent exchanges fail. Raises
+    # Paused while config.enabled is off, so nothing reaches the API.
     def client
+      ensure_enabled!
       configured = config.client
       return configured.respond_to?(:call) ? configured.call : configured if configured
 
