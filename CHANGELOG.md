@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Depends on railties, activerecord and activejob rather than all of Rails.
 - Agent definitions under `app/agents/<name>/`, rendered through ERB.
 - `managed_agents:create`, `sync`, `status` and `check` commands.
 - Sync through `ant apply` or the API, with remote IDs stored in the database.
@@ -20,4 +21,3 @@
 - `optional: true` on a vault credential skips it when its secret isn't set.
 - Multiagent rosters: `agent-<role>.md` files referenced from a coordinator's `multiagent.agents`.
 - Custom skills as `skills/<name>/` folders, uploaded and pinned by version.
-- Depends on railties, activerecord and activejob rather than all of Rails.
