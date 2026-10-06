@@ -105,6 +105,26 @@ environment: ../analyst/environment.yaml
 Sync creates the environment once, and sessions of every agent that names it run there. The
 `environment` key is not sent as part of the agent.
 
+### Skills
+
+A custom skill is a folder under the agent's `skills/` with a `SKILL.md` and any files it needs.
+List it by path; Anthropic skills are written as the API takes them.
+
+```
+app/agents/support_triage/skills/house-style/SKILL.md
+app/agents/support_triage/skills/house-style/examples.md
+```
+
+```yaml
+skills:
+  - ./skills/house-style
+  - {type: anthropic, skill_id: xlsx}
+```
+
+Skills are uploaded before the agents that use them and pinned by version. Changing any file in the
+folder uploads a new version and re-pins those agents. `--prune` forgets a deleted skill but leaves it
+in the workspace, since agents elsewhere may still pin it.
+
 ### Multiagent rosters
 
 A coordinator delegates to roster agents declared beside it as `agent-<role>.md`, and lists them
@@ -490,7 +510,7 @@ The helper swaps in an in-memory client for each test. `anthropic.calls` records
 
 ## Not covered yet
 
-Skills and memory stores as files, per-tenant agent definitions or overrides,
+Memory stores as files, per-tenant agent definitions or overrides,
 outcomes, and self-hosted sandboxes.
 
 ## Development
