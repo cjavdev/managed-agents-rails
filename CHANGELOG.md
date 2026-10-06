@@ -14,3 +14,4 @@
 - Vaults owned by any record (`has_agent_vault`), combined per session with `vaults:`.
 - MCP OAuth connect flow and a `connections` generator.
 - Agents can share another agent's environment with `environment: ../other/environment.yaml`.
+- `max_turn_duration`, `on_event`, `on_interrupt` and `archive_after_turn` on agents; `interrupt!` from callbacks.

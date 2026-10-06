@@ -29,6 +29,7 @@ module ManagedAgents
       failures = 0
 
       loop do
+        enforce_turn_deadline
         seen = session.events.count
         return finished if follow == :done
         return :continue if now > deadline
@@ -55,12 +56,36 @@ module ManagedAgents
     # The SDK's stream skips event types it doesn't know, usage among them, so
     # the totals are read from the session once the turn is over.
     def finished
-      remote = @client.beta.sessions.retrieve(session.remote_id)
-      usage = remote.try(:usage)
-      session.update!(usage: Events.to_hash(usage)) if usage
+      begin
+        remote = @client.beta.sessions.retrieve(session.remote_id)
+        usage = remote.try(:usage)
+        session.update!(usage: Events.to_hash(usage)) if usage
+      rescue Anthropic::Errors::APIError
+        nil
+      end
+      archive if agent.archive_after_turn && session.settled? && session.archived_at.nil?
       :done
-    rescue Anthropic::Errors::APIError
-      :done
+    end
+
+    def archive
+      session.archive!
+    rescue Anthropic::Errors::APIError => error
+      ManagedAgents.logger.warn("[managed_agents] could not archive #{session.remote_id}: #{error.message}")
+    end
+
+    # Interrupts a turn that has run past the agent's max_turn_duration.
+    def enforce_turn_deadline
+      deadline = agent.turn_deadline
+      agent.interrupt!(:deadline) if deadline && Time.current >= deadline && !session.settled?
+    end
+
+    # Seconds to hold the stream: the window, or less when the turn's deadline
+    # comes first, so a stream waiting for events cannot sleep through it.
+    def stream_timeout
+      deadline = agent.turn_deadline
+      return config.stream_window if deadline.nil? || agent.interrupted?
+
+      (deadline - Time.current).ceil.clamp(1, config.stream_window)
     end
 
     def follow
@@ -78,7 +103,7 @@ module ManagedAgents
     end
 
     def open_stream
-      params = {request_options: {timeout: config.stream_window, max_retries: 0}}
+      params = {request_options: {timeout: stream_timeout, max_retries: 0}}
       params[:event_deltas] = [:"agent.message"] if config.stream_deltas
       @client.beta.sessions.events.stream_events(session.remote_id, **params)
     end
@@ -95,12 +120,14 @@ module ManagedAgents
 
       event = session.record(payload)
       dispatch(event, live: true)
+      enforce_turn_deadline
       :done if event&.status? && done?
     end
 
     def dispatch(event, live:)
       return unless event
 
+      agent.event_received(event)
       case event.event_type
       when "agent.custom_tool_use"
         answer(event) if live
