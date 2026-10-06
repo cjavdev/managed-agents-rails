@@ -155,6 +155,8 @@ credentials:
 - `{credential: "linear.mcp_token"}` reads `ENV["LINEAR_MCP_TOKEN"]`, then
   `credentials.dig(Rails.env, :linear, :mcp_token)`, then `credentials.dig(:linear, :mcp_token)`.
 - `{env: "NAME"}` reads the environment only.
+- Mark a credential `optional: true` when some environments don't have its secret: there it is
+  skipped with a warning instead of failing the sync.
 - A literal value in `token`, `access_token`, `refresh_token`, `client_secret` or `secret_value` is
   rejected, so a secret can't be committed by accident.
 - Rotating the secret and syncing again updates the credential in place. Only a keyed digest of the

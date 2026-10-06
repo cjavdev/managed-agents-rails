@@ -69,7 +69,17 @@ module ManagedAgents
         key = self.class.key(credential)
         raise DefinitionError, "#{definition.name}: a credential needs auth.mcp_server_url or auth.secret_name" if key.blank?
 
-        body = self.class.credential_body(credential)
+        body = begin
+          self.class.credential_body(credential)
+        rescue MissingSecret => error
+          raise unless credential["optional"]
+
+          # An optional credential whose secret this environment doesn't have
+          # is left as it is, so one missing token doesn't stop the sync.
+          resource = Resource.lookup(definition.name, "credential", key)
+          @sync.say(:skipped, definition.name, "credential", key, error.message)
+          return Change.new(definition.name, "credential", key, :skipped, resource&.remote_id)
+        end
         digest = Digests.secret_digest(body)
         resource = Resource.lookup(definition.name, "credential", key)
         action = @sync.action_for(resource, digest)

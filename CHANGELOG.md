@@ -13,3 +13,4 @@
 - Sessions have an `owner`; the generated chat UI only shows a person their own.
 - Vaults owned by any record (`has_agent_vault`), combined per session with `vaults:`.
 - MCP OAuth connect flow and a `connections` generator.
+- `optional: true` on a vault credential skips it when its secret isn't set.
