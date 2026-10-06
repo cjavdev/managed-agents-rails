@@ -16,7 +16,7 @@ module ManagedAgents
 
       def apply(definitions)
         changes = definitions.flat_map do |definition|
-          [upsert(definition, "environment"), upsert(definition, "agent")]
+          [(upsert(definition, "environment") unless definition.shared_environment?), upsert(definition, "agent")].compact
         end
         changes + definitions.flat_map do |definition|
           definition.deployment_paths.keys.map { |key| upsert(definition, "deployment", key) }

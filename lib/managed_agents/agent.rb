@@ -72,7 +72,7 @@ module ManagedAgents
 
       def agent_id = Resource.remote_id!(definition.name, "agent")
 
-      def environment_id = Resource.remote_id!(definition.name, "environment")
+      def environment_id = Resource.remote_id!(definition.environment_owner, "environment")
 
       def agent_version
         Resource.lookup(definition.name, "agent")&.remote_version&.to_i
@@ -90,7 +90,7 @@ module ManagedAgents
       end
 
       def synced?
-        Resource.lookup(definition.name, "agent").present? && Resource.lookup(definition.name, "environment").present?
+        Resource.lookup(definition.name, "agent").present? && Resource.lookup(definition.environment_owner, "environment").present?
       end
 
       # Creates a session and, when given a message, sends it and starts

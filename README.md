@@ -89,6 +89,22 @@ You triage support tickets. Read the ticket and call set_priority once.
   `environment_id: ./environment.yaml`, `vault_ids: [./vault.yaml]`.
 - A deployment can be YAML with `initial_events`, or Markdown whose body is the kickoff message.
 
+### Sharing an environment
+
+Agents that should boot from the same sandbox can share one environment. Give the other agents no
+`environment.yaml` and point at the one that has it:
+
+```markdown
+---
+name: Weekly reviewer
+model: claude-opus-5-5
+environment: ../analyst/environment.yaml
+---
+```
+
+Sync creates the environment once, and sessions of every agent that names it run there. The
+`environment` key is not sent as part of the agent.
+
 Scaffold one with either command:
 
 ```sh
