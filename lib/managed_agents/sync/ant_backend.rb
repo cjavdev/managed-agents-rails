@@ -78,10 +78,9 @@ module ManagedAgents
       end
 
       def sources(definition)
-        sources = {
-          definition.environment_path => source(definition, "environment"),
-          definition.agent_path => source(definition, "agent")
-        }
+        sources = {}
+        sources[definition.environment_path] = source(definition, "environment") unless definition.shared_environment?
+        sources[definition.agent_path] = source(definition, "agent")
         definition.deployment_paths.each { |key, path| sources[path] = source(definition, "deployment", key) }
         sources
       end
@@ -89,9 +88,15 @@ module ManagedAgents
       def source(definition, kind, key = "")
         case kind
         when "environment" then definition.environment.to_source
-        when "agent" then definition.agent.to_source
+        when "agent" then agent_source(definition)
         when "deployment" then deployment_source(definition, definition.deployments.fetch(key))
         end
+      end
+
+      # `environment:` is this gem's, not part of the agent `ant apply` creates.
+      def agent_source(definition)
+        document = definition.agent
+        document.data.key?("environment") ? document.to_source(document.data.except("environment")) : document.to_source
       end
 
       # `ant apply` resolves the agent and environment paths itself, but sends

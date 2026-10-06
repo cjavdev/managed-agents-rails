@@ -66,13 +66,35 @@ module ManagedAgents
 
     # The agents.create body: frontmatter plus the Markdown body as `system`.
     def agent_body
-      body = agent.data.except("type")
+      body = agent.data.except("type", "environment")
       body["system"] ||= agent.body if agent.body
       body
     end
 
     def environment_body
       environment.data.except("type")
+    end
+
+    # Another agent's environment.yaml, when agent.md names one with
+    # `environment: ../other/environment.yaml`, so several agents boot from
+    # one environment. Nil when the agent has its own.
+    def environment_reference
+      value = agent.data["environment"]
+      return if value.nil?
+
+      reference = resolve_reference(value, from: agent_path) if value.is_a?(String)
+      unless reference&.kind == "environment" && reference.key.empty?
+        raise DefinitionError, "#{name}: environment must be a relative path to another agent's environment.yaml, " \
+          "got #{value.inspect}"
+      end
+      reference
+    end
+
+    def shared_environment? = !environment_reference.nil?
+
+    # The agent folder whose environment sessions of this agent run in.
+    def environment_owner
+      environment_reference&.agent_name || name
     end
 
     def vault_body
@@ -113,7 +135,7 @@ module ManagedAgents
 
     def problems
       problems = []
-      problems << "#{name}: environment.yaml is missing" unless environment_path
+      check(problems) { check_environment(problems) }
       check(problems) { problems << "#{name}: agent needs a name" if agent.data["name"].blank? }
       check(problems) { problems << "#{name}: agent needs a model" if agent.data["model"].blank? }
       check(problems) { environment if environment_path }
@@ -136,6 +158,17 @@ module ManagedAgents
     end
 
     private
+
+    def check_environment(problems)
+      reference = environment_reference
+      if reference.nil?
+        problems << "#{name}: environment.yaml is missing" unless environment_path
+      elsif environment_path
+        problems << "#{name}: has its own environment.yaml and also uses #{agent.data["environment"]}; keep one"
+      elsif reference.agent_name == name || !self.class.new(reference.agent_name).environment_path
+        problems << "#{name}: environment #{agent.data["environment"]} does not point at another agent's environment.yaml"
+      end
+    end
 
     def check(problems)
       yield
