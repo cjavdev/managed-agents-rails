@@ -72,7 +72,9 @@ module ManagedAgents
         expected(definition).map do |kind, key, path|
           resource = Resource.lookup(definition.name, kind, key)
           state = "not synced" unless resource
-          state ||= (resource.digest == current_digest(definition, kind, key, resource)) ? "synced" : "pending"
+          # No current digest means its secret can't be read here, so it can't be called synced.
+          current = resource && current_digest(definition, kind, key, resource)
+          state ||= (current && resource.digest == current) ? "synced" : "pending"
           [definition.name, label(kind, key), resource&.remote_id, resource&.remote_version, state]
         end
       end
