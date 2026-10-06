@@ -231,6 +231,40 @@ module ManagedAgents
       end
     end
 
+    # Uploaded files are recorded as their names; each upload is a new version.
+    class SkillVersions
+      def initialize(client) = @client = client
+
+      def create(skill_id, files:, **)
+        @client.calls << [:"skill.versions.create", {id: skill_id, files: Skills.names(files)}]
+        version = Record.new(id: Testing.next_id("skillver"), skill_id: skill_id, type: "skill_version")
+        latest = {latest_version_id: version.id}
+        @client.beta.skills.retrieve(skill_id).merge!(latest)
+        version
+      end
+    end
+
+    class Skills < Collection
+      attr_reader :versions
+
+      def self.names(files) = files.map { |file| file.try(:filename) || file.to_s }
+
+      def initialize(client)
+        super(client, "skill")
+        @versions = SkillVersions.new(client)
+      end
+
+      def create(files:, **params)
+        @client.calls << [:"skill.create", params.merge(files: Skills.names(files))]
+        store(Record.new(params.merge(id: Testing.next_id("skill"), latest_version_id: Testing.next_id("skillver"), type: "skill")))
+      end
+
+      def delete(id, **)
+        @client.calls << [:"skill.delete", {id: id}]
+        @records.delete(id)
+      end
+    end
+
     class Webhooks
       # Signature checks are the SDK's job; the fake just parses the payload.
       def unwrap(payload, **)
@@ -239,7 +273,7 @@ module ManagedAgents
     end
 
     class Beta
-      attr_reader :agents, :environments, :vaults, :deployments, :deployment_runs, :sessions, :webhooks
+      attr_reader :agents, :environments, :vaults, :deployments, :deployment_runs, :sessions, :skills, :webhooks
 
       def initialize(client)
         @agents = Collection.new(client, "agent", versioned: true)
@@ -248,6 +282,7 @@ module ManagedAgents
         @deployments = Deployments.new(client, "depl")
         @deployment_runs = DeploymentRuns.new(client, "drun")
         @sessions = Sessions.new(client)
+        @skills = Skills.new(client)
         @webhooks = Webhooks.new
       end
     end

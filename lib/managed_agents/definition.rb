@@ -1,7 +1,8 @@
 module ManagedAgents
   # The files for one agent: app/agents/<name>/{agent.md, environment.yaml,
   # vault.yaml, deployment-*.yaml}, plus agent-<role>.md for each roster agent
-  # of a multiagent coordinator.
+  # of a multiagent coordinator and skills/<skill>/SKILL.md for each custom
+  # skill its agents use.
   class Definition
     EXTENSIONS = %w[md yaml yml].freeze
     DEPLOYMENT = /\Adeployment(?:[-_](?<key>.+))?\.(?:md|ya?ml)\z/
@@ -72,6 +73,22 @@ module ManagedAgents
       roster_paths.transform_values { |path| document(path) }
     end
 
+    # Custom skills, keyed by directory name: skills/<skill>/SKILL.md plus any
+    # files beside it.
+    def skill_paths
+      skills = root.join("skills")
+      return {} unless skills.directory?
+
+      skills.children.sort.select { |path| path.join("SKILL.md").file? }.to_h { |path| [path.basename.to_s, path] }
+    end
+
+    # Every file of a skill, keyed by the name it is uploaded under. The API
+    # wants them all inside one top-level directory named for the skill.
+    def skill_files(key)
+      dir = skill_paths.fetch(key.to_s)
+      dir.glob("**/*").select(&:file?).sort.to_h { |file| ["#{key}/#{file.relative_path_from(dir)}", file] }
+    end
+
     def agent = document(agent_path)
 
     # The coordinator for "", a roster agent for its role.
@@ -128,9 +145,12 @@ module ManagedAgents
 
     # What a relative path written in one of this agent's files points at.
     def resolve_reference(value, from:)
-      return unless value.is_a?(String) && value.match?(/\.(md|ya?ml)\z/)
+      return unless value.is_a?(String)
 
       target = Pathname(from).dirname.join(value).cleanpath
+      return resolve_skill(target) if target.dirname.basename.to_s == "skills"
+      return unless value.match?(/\.(md|ya?ml)\z/)
+
       owner = self.class.new(target.dirname.basename.to_s)
       return unless target.dirname == owner.root
 
@@ -176,6 +196,11 @@ module ManagedAgents
     end
 
     private
+
+    def resolve_skill(target)
+      owner = self.class.new(target.dirname.dirname.basename.to_s)
+      Reference.new(owner.name, "skill", target.basename.to_s) if owner.skill_paths[target.basename.to_s] == target
+    end
 
     def check(problems)
       yield

@@ -78,7 +78,11 @@ module ManagedAgents
       end
 
       def sources(definition)
-        sources = {definition.environment_path => source(definition, "environment")}
+        # Skill files are copied as they are; `ant apply` uploads the skills an
+        # agent references.
+        sources = definition.skill_paths.keys.flat_map { |key| definition.skill_files(key).values }
+          .to_h { |path| [path, path.binread] }
+        sources[definition.environment_path] = source(definition, "environment")
         definition.roster_paths.each { |key, path| sources[path] = source(definition, "agent", key) }
         sources[definition.agent_path] = source(definition, "agent")
         definition.deployment_paths.each { |key, path| sources[path] = source(definition, "deployment", key) }
@@ -87,6 +91,7 @@ module ManagedAgents
 
       def source(definition, kind, key = "")
         case kind
+        when "skill" then definition.skill_files(key).map { |name, path| "#{name}:#{Digest::SHA256.file(path).hexdigest}" }.join("\n")
         when "environment" then definition.environment.to_source
         when "agent" then definition.agent_document(key).to_source
         when "deployment" then deployment_source(definition, definition.deployments.fetch(key))
@@ -144,7 +149,7 @@ module ManagedAgents
 
           Resource.record!(agent_name: name, kind: kind, key: key, remote_id: entry["id"],
             remote_version: entry["version"]&.to_s, backend: "ant", path: path.delete_prefix("./"),
-            digest: staged_digest(path), workspace_id: lock.dig("origin", "workspace_id"),
+            digest: (kind == "skill") ? digest(Definition.find(name), kind, key) : staged_digest(path), workspace_id: lock.dig("origin", "workspace_id"),
             lock_data: {"version" => lock["version"], "origin" => lock["origin"], "entry" => entry})
         end
         lock.fetch("resources", {})
@@ -156,8 +161,12 @@ module ManagedAgents
       end
 
       # "./app/agents/support_triage/deployment-daily.yaml" -> ["support_triage", "deployment", "daily"]
+      # "./app/agents/desk/skills/voice" -> ["desk", "skill", "voice"]
       def identify(path)
         file = Pathname(path.delete_prefix("./"))
+        file = file.dirname if file.basename.to_s == "SKILL.md"
+        return [file.dirname.dirname.basename.to_s, "skill", file.basename.to_s] if file.dirname.basename.to_s == "skills"
+
         name = file.dirname.basename.to_s
         base = file.basename.to_s
 
