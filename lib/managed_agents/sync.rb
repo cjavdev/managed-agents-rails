@@ -216,7 +216,7 @@ module ManagedAgents
 
     def report(changes)
       counts = changes.group_by(&:action).transform_values(&:size)
-      summary = %i[create update unchanged archive orphaned].filter_map { |action| "#{counts[action]} #{action}" if counts[action] }
+      summary = %i[create update unchanged skipped archive orphaned].filter_map { |action| "#{counts[action]} #{action}" if counts[action] }
       io.puts "#{dry_run ? "Plan" : "Synced"} (#{backend_name} backend): #{summary.join(", ").presence || "nothing to do"}"
     end
 

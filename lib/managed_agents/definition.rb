@@ -152,6 +152,8 @@ module ManagedAgents
       check(problems) do
         credentials.each do |credential|
           Secrets.resolve(credential.fetch("auth", {}))
+        rescue MissingSecret
+          raise unless credential["optional"]
         end
       end
       problems
