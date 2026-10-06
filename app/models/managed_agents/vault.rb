@@ -47,17 +47,9 @@ module ManagedAgents
     # and client that issued it) Anthropic keeps the access token fresh.
     def connect_oauth(url, access_token:, refresh_token: nil, expires_at: nil, token_endpoint: nil, client_id: nil,
       client_secret: nil, client_auth: nil, scope: nil, resource: nil, display_name: nil)
-      auth = {type: "mcp_oauth", mcp_server_url: url, access_token: access_token, expires_at: expires_at&.iso8601}.compact
-      if refresh_token
-        auth[:refresh] = {
-          refresh_token: refresh_token,
-          token_endpoint: token_endpoint,
-          client_id: client_id,
-          scope: scope,
-          resource: resource,
-          token_endpoint_auth: token_endpoint_auth(client_secret, client_auth)
-        }.compact
-      end
+      auth = CredentialAuth.mcp_oauth(url, access_token: access_token, refresh_token: refresh_token, expires_at: expires_at,
+        token_endpoint: token_endpoint, client_id: client_id, client_secret: client_secret, client_auth: client_auth,
+        scope: scope, resource: resource)
       store(auth, display_name: display_name, details: {scope: scope}.compact)
     end
 
@@ -85,12 +77,6 @@ module ManagedAgents
 
     def connection_key(key)
       key.to_s.match?(%r{\Ahttps?://}i) ? MCP.normalize(key) : key.to_s
-    end
-
-    def token_endpoint_auth(client_secret, client_auth)
-      return {type: "none"} if client_secret.blank?
-
-      {type: (client_auth || "client_secret_post").to_s, client_secret: client_secret}
     end
 
     # Rotates in place when only the secret changed, so sessions already

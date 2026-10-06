@@ -34,12 +34,37 @@ module Rails
       end
 
       desc "status", "Show which definitions are synced, pending or orphaned"
+      option :validate, type: :boolean, default: false, desc: "Also check that signed-in credentials still work"
       def status
         boot_application!
         guard do
-          rows = ManagedAgents::Sync.new.status
+          rows = ManagedAgents::Sync.new.status(validate: options[:validate])
           print_table([%w[Agent Resource ID Version State], *rows.map { |row| row.map(&:to_s) }])
-          exit 1 if rows.any? { |row| row.last != "synced" }
+          exit 1 if rows.any? { |row| !ManagedAgents::Sync::STATES_OK.include?(row.last) }
+        end
+      end
+
+      desc "connect AGENT [URL]", "Sign in to an MCP server that the agent's vault.yaml declares with connect: oauth"
+      option :redirect_uri, type: :string, default: "http://localhost:8976/callback",
+        desc: "Where the authorization server sends the browser back to"
+      option :listen, type: :boolean, default: true, desc: "Wait for the browser on the redirect URI's port as well as for a pasted address"
+      def connect(agent_name = nil, url = nil)
+        boot_application!
+        guard do
+          raise ManagedAgents::Error, "Name the agent: bin/rails managed_agents:connect AGENT [URL]" if agent_name.blank?
+
+          vault = ManagedAgents::AgentVault.new(agent_name)
+          declared = vault.declared
+          raise ManagedAgents::Error, "#{vault.name}: vault.yaml declares no credential with connect: oauth" if declared.empty?
+          if url.blank?
+            raise ManagedAgents::Error, "#{vault.name} declares several; name one: #{declared.map { |c| vault.server_url(c) }.join(", ")}" if declared.many?
+            url = vault.server_url(declared.sole)
+          end
+
+          credential = vault.credential(url)
+          ManagedAgents::OAuth::Terminal.new(vault, vault.server_url(credential), redirect_uri: options[:redirect_uri],
+            scope: credential["scope"], listen: options[:listen]).run
+          say "Connected #{vault.server_url(credential)} in #{vault.name}'s vault."
         end
       end
 

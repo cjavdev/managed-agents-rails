@@ -9,18 +9,22 @@ module ManagedAgents
     class Flow
       # What has to survive between sending the person away and their return.
       # Keep it in the session: the code verifier must not leave the server.
-      Request = Struct.new(:url, :state, :code_verifier, :server_url, :redirect_uri, keyword_init: true) do
-        def to_h = super.except(:url).stringify_keys
+      Request = Struct.new(:url, :state, :code_verifier, :server_url, :redirect_uri, :scope, keyword_init: true) do
+        def to_h = super.except(:url).compact.stringify_keys
       end
 
       Tokens = Struct.new(:access_token, :refresh_token, :expires_at, :scope, keyword_init: true)
 
       attr_reader :server_url, :redirect_uri
 
-      def initialize(server_url, redirect_uri:)
+      # `scope` overrides the scopes the server advertises.
+      def initialize(server_url, redirect_uri:, scope: nil)
         @server_url = server_url
         @redirect_uri = redirect_uri
+        @scope = scope.presence
       end
+
+      def scope = @scope || client.scope
 
       def authorization_request
         state = SecureRandom.urlsafe_base64(32)
@@ -32,13 +36,14 @@ module ManagedAgents
           state: state,
           code_challenge: Base64.urlsafe_encode64(Digest::SHA256.digest(verifier), padding: false),
           code_challenge_method: "S256",
-          scope: client.scope,
+          scope: scope,
           resource: server_url
         }.compact
 
         endpoint = URI.parse(client.endpoints.fetch("authorization_endpoint"))
         endpoint.query = [endpoint.query, URI.encode_www_form(query)].compact.join("&")
-        Request.new(url: endpoint.to_s, state: state, code_verifier: verifier, server_url: server_url, redirect_uri: redirect_uri)
+        Request.new(url: endpoint.to_s, state: state, code_verifier: verifier, server_url: server_url, redirect_uri: redirect_uri,
+          scope: @scope)
       end
 
       def exchange(code:, code_verifier:)
@@ -59,7 +64,7 @@ module ManagedAgents
           raise Error, "The token request failed: #{body["error_description"] || body["error"] || "HTTP #{response.status}"}"
         end
 
-        Tokens.new(access_token: body["access_token"], refresh_token: body["refresh_token"], scope: body["scope"] || client.scope,
+        Tokens.new(access_token: body["access_token"], refresh_token: body["refresh_token"], scope: body["scope"] || scope,
           expires_at: body["expires_in"] && Time.current + body["expires_in"].to_i)
       end
 
