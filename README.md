@@ -354,6 +354,19 @@ ActiveSupport::Notifications.subscribe("webhook.managed_agents") do |event|
 end
 ```
 
+### Pausing every API call
+
+```ruby
+# config/initializers/managed_agents.rb
+ManagedAgents.configure do |config|
+  config.enabled = -> { ENV["MANAGED_AGENTS_ENABLED"] == "true" }
+end
+```
+
+While `enabled` is false, `ManagedAgents.client` raises `ManagedAgents::Paused`, the engine's jobs
+finish without calling the API, webhook deliveries are acknowledged and dropped, and `sync` refuses to
+run (`status`, `check` and `--dry-run` still work). A callable is checked on every call.
+
 ### Queues
 
 A `SessionJob` lasts as long as the agent's turn. Give it a queue with spare threads

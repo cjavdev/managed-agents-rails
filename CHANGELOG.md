@@ -13,3 +13,4 @@
 - Sessions have an `owner`; the generated chat UI only shows a person their own.
 - Vaults owned by any record (`has_agent_vault`), combined per session with `vaults:`.
 - MCP OAuth connect flow and a `connections` generator.
+- `config.enabled` kill switch: while off, the client raises `ManagedAgents::Paused`, engine jobs skip and webhooks are dropped.

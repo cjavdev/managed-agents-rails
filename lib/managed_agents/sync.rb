@@ -15,7 +15,7 @@ module ManagedAgents
   # their credentials always go through the SDK, because `ant apply` does not
   # manage credentials.
   class Sync
-    attr_reader :dry_run, :force, :prune, :adopt, :io, :client
+    attr_reader :dry_run, :force, :prune, :adopt, :io
 
     def initialize(only: nil, backend: nil, dry_run: false, force: false, prune: false, adopt: false,
       io: $stdout, client: nil)
@@ -26,10 +26,16 @@ module ManagedAgents
       @prune = prune
       @adopt = adopt
       @io = io
-      @client = client || ManagedAgents.client
+      @client = client
+    end
+
+    # Resolved on first use, so `status` and `check` work without the API.
+    def client
+      @client ||= ManagedAgents.client
     end
 
     def apply
+      ManagedAgents.ensure_enabled! unless dry_run
       check!
       verify_workspace!
 
