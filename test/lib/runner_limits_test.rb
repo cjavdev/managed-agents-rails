@@ -1,7 +1,7 @@
 require "test_helper"
 
 class RunnerLimitsTest < ActiveSupport::TestCase
-  ATTRIBUTES = %i[event_callbacks interrupt_callbacks max_turn_duration archive_after_turn].freeze
+  ATTRIBUTES = %i[event_callbacks interrupt_callbacks max_turn_duration archive_after_turn tools validate_tool_input].freeze
 
   setup do
     @saved = ATTRIBUTES.to_h { |name| [name, SupportTriageAgent.public_send(name)] }
@@ -107,5 +107,26 @@ class RunnerLimitsTest < ActiveSupport::TestCase
 
     assert_empty anthropic.calls_to(:"sesn.archive")
     assert_nil @session.reload.archived_at
+  end
+
+  test "a handler can read the ID of the call it is answering" do
+    ids = []
+    SupportTriageAgent.tool(:set_priority) { |_input| ids << tool_use_id }
+    call = custom_tool_use("set_priority", priority: "high")
+    anthropic.respond_with call, idle("requires_action"), agent_message("Done."), idle
+
+    run_session
+
+    assert_equal [call[:id]], ids
+  end
+
+  test "validate_tool_input false hands bad input to the handler" do
+    SupportTriageAgent.validate_tool_input = false
+    SupportTriageAgent.tool(:set_priority) { |input| ManagedAgents::Tool.error("my own words: #{input[:priority]}") }
+    anthropic.respond_with custom_tool_use("set_priority", priority: "urgent"), agent_message("Sorry."), idle
+
+    run_session
+
+    assert_equal "my own words: urgent", anthropic.tool_results.sole[:content].first[:text]
   end
 end

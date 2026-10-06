@@ -335,6 +335,10 @@ end
 - A tool call is answered once per call ID, including after a crash and replay. Handlers can still
   run twice if the process dies between running the handler and sending the result, so keep them
   idempotent.
+  `tool_use_id` is the call's ID inside a handler, and stays the same when the call is answered
+  again, so it can key an idempotent write.
+- `self.validate_tool_input = false` skips the schema check, for handlers that validate input
+  themselves.
 
 ### Limits, events and cleanup
 

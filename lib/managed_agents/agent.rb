@@ -30,6 +30,11 @@ module ManagedAgents
     # session. An archived session holds no container and takes no messages.
     class_attribute :archive_after_turn, default: false
 
+    # Check custom tool input against its input_schema before the handler
+    # runs. Turn it off when the handlers validate input themselves and want
+    # to answer a bad call in their own words.
+    class_attribute :validate_tool_input, default: true
+
     class << self
       attr_writer :agent_name
 
@@ -177,20 +182,30 @@ module ManagedAgents
 
     def owner = session.owner
 
-    def call_tool(name, input)
+    # The ID of the agent.custom_tool_use being answered, while a handler
+    # runs. The same call keeps its ID if it is answered again after a crash,
+    # so a handler can use it to make a write idempotent.
+    attr_reader :tool_use_id
+
+    def call_tool(name, input, tool_use_id: nil)
       handler = tools[name.to_s]
       return Tool.error("No handler is registered for the #{name} tool") unless handler
 
-      schema = self.class.definition.custom_tool(name)&.dig("input_schema")
-      problems = Schema.problems(input, schema)
-      return Tool.error("Invalid input: #{problems.join("; ")}") if problems.any?
+      if validate_tool_input
+        schema = self.class.definition.custom_tool(name)&.dig("input_schema")
+        problems = Schema.problems(input, schema)
+        return Tool.error("Invalid input: #{problems.join("; ")}") if problems.any?
+      end
 
+      @tool_use_id = tool_use_id
       Tool.result(instance_exec(input.with_indifferent_access, &handler))
     rescue ToolError => error
       Tool.error(error.message)
     rescue => error
       report(error, tool: name)
       Tool.error("#{name} failed: #{error.class}: #{error.message}")
+    ensure
+      @tool_use_id = nil
     end
 
     def turn_finished
