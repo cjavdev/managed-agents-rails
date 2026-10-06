@@ -83,6 +83,14 @@ module ManagedAgents
       Array(vault&.data&.fetch("credentials", nil))
     end
 
+    # A credential whose tokens come from signing in (`connect: oauth`), not
+    # from the file: `bin/rails managed_agents:connect` puts them in the vault.
+    def self.connected_credential?(credential) = credential.key?("connect")
+
+    def connected_credentials
+      credentials.select { |credential| self.class.connected_credential?(credential) }
+    end
+
     def custom_tools
       Array(agent.data["tools"]).select { |tool| tool["type"] == "custom" }
     end
@@ -129,6 +137,8 @@ module ManagedAgents
       end
       check(problems) do
         credentials.each do |credential|
+          next check_connected(problems, credential) if self.class.connected_credential?(credential)
+
           Secrets.resolve(credential.fetch("auth", {}))
         end
       end
@@ -136,6 +146,17 @@ module ManagedAgents
     end
 
     private
+
+    def check_connected(problems, credential)
+      auth = credential["auth"].to_h
+      label = auth["mcp_server_url"] || credential["display_name"] || "a credential"
+      problems << "#{name}: #{label}: connect must be oauth" unless credential["connect"] == "oauth"
+      unless auth["type"] == "mcp_oauth" && auth["mcp_server_url"].present?
+        problems << "#{name}: #{label}: a connected credential needs auth.type mcp_oauth and auth.mcp_server_url"
+      end
+      extra = auth.keys - %w[type mcp_server_url]
+      problems << "#{name}: #{label}: #{extra.join(", ")} come from signing in, not from vault.yaml" if extra.any?
+    end
 
     def check(problems)
       yield
