@@ -165,7 +165,17 @@ module ManagedAgents
 
     def done?
       session.reload
-      session.settled? || session.awaiting_confirmation? || session.events.none?
+      return true if session.settled? || session.awaiting_confirmation?
+
+      session.events.none? && remote_idle?
+    end
+
+    # A session with nothing recorded is only finished when the API says it
+    # is idle: one just attached, whose log is still empty, may be working.
+    def remote_idle?
+      @client.beta.sessions.retrieve(session.remote_id).status.to_s == "idle"
+    rescue Anthropic::Errors::APIError
+      true
     end
 
     def agent
