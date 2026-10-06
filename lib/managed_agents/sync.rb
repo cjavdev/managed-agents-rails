@@ -170,7 +170,7 @@ module ManagedAgents
     end
 
     def expected(definition)
-      rows = []
+      rows = definition.skill_paths.map { |key, path| ["skill", key, path] }
       rows << ["environment", "", definition.environment_path] unless definition.shared_environment?
       definition.roster_paths.each { |key, path| rows << ["agent", key, path] }
       rows << ["agent", "", definition.agent_path]
@@ -208,6 +208,9 @@ module ManagedAgents
       when "agent" then client.beta.agents.archive(resource.remote_id)
       when "environment" then client.beta.environments.archive(resource.remote_id)
       when "deployment" then client.beta.deployments.archive(resource.remote_id)
+      # Skills can't be archived, and deleting one breaks agents still pinned
+      # to it, so pruning only forgets the local row.
+      when "skill" then nil
       when "vault" then client.beta.vaults.archive(resource.remote_id)
       when "credential"
         vault = Resource.lookup(resource.agent_name, "vault")
