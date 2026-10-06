@@ -14,8 +14,11 @@ module ManagedAgents
       end
 
       def apply(definitions)
+        # Roster agents go before their coordinator, which pins their versions.
         changes = definitions.flat_map do |definition|
-          [upsert(definition, "environment"), upsert(definition, "agent")]
+          [upsert(definition, "environment"),
+            *definition.roster_paths.keys.map { |key| upsert(definition, "agent", key) },
+            upsert(definition, "agent")]
         end
         changes + definitions.flat_map do |definition|
           definition.deployment_paths.keys.map { |key| upsert(definition, "deployment", key) }
@@ -90,7 +93,7 @@ module ManagedAgents
       def path(definition, kind, key)
         case kind
         when "environment" then definition.environment_path
-        when "agent" then definition.agent_path
+        when "agent" then definition.agent_document_path(key)
         when "deployment" then definition.deployment_paths.fetch(key)
         end
       end
@@ -98,8 +101,19 @@ module ManagedAgents
       def body(definition, kind, key)
         case kind
         when "environment" then definition.environment_body
-        when "agent" then definition.agent_body
+        when "agent" then agent_body(definition, key)
         when "deployment" then deployment_body(definition, key)
+        end
+      end
+
+      def agent_body(definition, key)
+        body = definition.agent_body(key)
+        roster = body.dig("multiagent", "agents")
+        return body unless roster.is_a?(Array)
+
+        from = definition.agent_document_path(key)
+        body.deep_dup.tap do |resolved|
+          resolved["multiagent"]["agents"] = roster.map { |value| agent_reference(definition, value, from) }
         end
       end
 

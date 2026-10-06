@@ -15,3 +15,4 @@
 - MCP OAuth connect flow and a `connections` generator.
 - `config.enabled` kill switch: while off, the client raises `ManagedAgents::Paused`, engine jobs skip and webhooks are dropped.
 - `optional: true` on a vault credential skips it when its secret isn't set.
+- Multiagent rosters: `agent-<role>.md` files referenced from a coordinator's `multiagent.agents`.

@@ -1,9 +1,11 @@
 module ManagedAgents
   # The files for one agent: app/agents/<name>/{agent.md, environment.yaml,
-  # vault.yaml, deployment-*.yaml}.
+  # vault.yaml, deployment-*.yaml}, plus agent-<role>.md for each roster agent
+  # of a multiagent coordinator.
   class Definition
     EXTENSIONS = %w[md yaml yml].freeze
     DEPLOYMENT = /\Adeployment(?:[-_](?<key>.+))?\.(?:md|ya?ml)\z/
+    ROSTER = /\Aagent[-_](?<key>.+)\.(?:md|ya?ml)\z/
 
     Reference = Struct.new(:agent_name, :kind, :key)
 
@@ -54,7 +56,32 @@ module ManagedAgents
       end
     end
 
+    # Roster agents a coordinator delegates to, keyed by role:
+    # agent-writer.md is "writer". They run as threads of the coordinator's
+    # sessions and are referenced from its `multiagent.agents` by path.
+    def roster_paths
+      return {} unless root.directory?
+
+      root.children.sort.each_with_object({}) do |path, found|
+        match = path.basename.to_s.match(ROSTER)
+        found[match[:key]] = path if match
+      end
+    end
+
+    def roster
+      roster_paths.transform_values { |path| document(path) }
+    end
+
     def agent = document(agent_path)
+
+    # The coordinator for "", a roster agent for its role.
+    def agent_document(key = "")
+      key.to_s.empty? ? agent : document(roster_paths.fetch(key.to_s))
+    end
+
+    def agent_document_path(key = "")
+      key.to_s.empty? ? agent_path : roster_paths.fetch(key.to_s)
+    end
 
     def environment = document(environment_path)
 
@@ -65,9 +92,10 @@ module ManagedAgents
     end
 
     # The agents.create body: frontmatter plus the Markdown body as `system`.
-    def agent_body
-      body = agent.data.except("type")
-      body["system"] ||= agent.body if agent.body
+    def agent_body(key = "")
+      document = agent_document(key)
+      body = document.data.except("type")
+      body["system"] ||= document.body if document.body
       body
     end
 
@@ -83,8 +111,11 @@ module ManagedAgents
       Array(vault&.data&.fetch("credentials", nil))
     end
 
+    # Custom tools of the coordinator and its roster: a roster agent's calls
+    # arrive in the coordinator's session and are answered by the same class.
     def custom_tools
-      Array(agent.data["tools"]).select { |tool| tool["type"] == "custom" }
+      [agent, *roster.values].flat_map { |document| Array(document.data["tools"]) }
+        .select { |tool| tool["type"] == "custom" }.uniq { |tool| tool["name"] }
     end
 
     def custom_tool(name)
@@ -106,6 +137,8 @@ module ManagedAgents
       base = target.basename.to_s
       if (match = base.match(DEPLOYMENT))
         Reference.new(owner.name, "deployment", match[:key] || "default")
+      elsif (match = base.match(ROSTER))
+        Reference.new(owner.name, "agent", match[:key])
       elsif (kind = %w[agent environment vault].find { |candidate| base.start_with?(candidate) })
         Reference.new(owner.name, kind, "")
       end
@@ -116,6 +149,11 @@ module ManagedAgents
       problems << "#{name}: environment.yaml is missing" unless environment_path
       check(problems) { problems << "#{name}: agent needs a name" if agent.data["name"].blank? }
       check(problems) { problems << "#{name}: agent needs a model" if agent.data["model"].blank? }
+      check(problems) do
+        roster.each do |key, document|
+          %w[name model].each { |field| problems << "#{name}: roster agent #{key} needs a #{field}" if document.data[field].blank? }
+        end
+      end
       check(problems) { environment if environment_path }
       check(problems) do
         deployments.each do |key, deployment|
