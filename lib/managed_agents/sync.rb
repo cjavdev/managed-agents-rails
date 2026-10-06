@@ -172,6 +172,7 @@ module ManagedAgents
     def expected(definition)
       rows = []
       rows << ["environment", "", definition.environment_path] unless definition.shared_environment?
+      definition.roster_paths.each { |key, path| rows << ["agent", key, path] }
       rows << ["agent", "", definition.agent_path]
       rows << ["vault", "", definition.vault_path] if definition.vault_path
       definition.credentials.each { |credential| rows << ["credential", Vaults.key(credential), definition.vault_path] }

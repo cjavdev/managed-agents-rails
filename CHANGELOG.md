@@ -16,3 +16,4 @@
 - Agents can share another agent's environment with `environment: ../other/environment.yaml`.
 - `config.enabled` kill switch: while off, the client raises `ManagedAgents::Paused`, engine jobs skip and webhooks are dropped.
 - `optional: true` on a vault credential skips it when its secret isn't set.
+- Multiagent rosters: `agent-<role>.md` files referenced from a coordinator's `multiagent.agents`.
