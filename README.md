@@ -89,6 +89,23 @@ You triage support tickets. Read the ticket and call set_priority once.
   `environment_id: ./environment.yaml`, `vault_ids: [./vault.yaml]`.
 - A deployment can be YAML with `initial_events`, or Markdown whose body is the kickoff message.
 
+### Multiagent rosters
+
+A coordinator delegates to roster agents declared beside it as `agent-<role>.md`, and lists them
+by path. Roster agents are synced first and pinned by version, so editing one re-pins the
+coordinator. They run as threads of the coordinator's sessions, so they have no environment of their
+own, and their custom tools are answered by the coordinator's agent class.
+
+```markdown
+---
+name: Reply desk
+model: claude-opus-5-5
+multiagent:
+  type: coordinator
+  agents: [./agent-researcher.md, ./agent-writer.md]
+---
+```
+
 Scaffold one with either command:
 
 ```sh
@@ -409,7 +426,7 @@ The helper swaps in an in-memory client for each test. `anthropic.calls` records
 
 ## Not covered yet
 
-Skills and memory stores as files, multiagent rosters, per-tenant agent definitions or overrides,
+Skills and memory stores as files, per-tenant agent definitions or overrides,
 outcomes, and self-hosted sandboxes.
 
 ## Development

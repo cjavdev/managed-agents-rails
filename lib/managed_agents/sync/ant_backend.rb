@@ -78,10 +78,9 @@ module ManagedAgents
       end
 
       def sources(definition)
-        sources = {
-          definition.environment_path => source(definition, "environment"),
-          definition.agent_path => source(definition, "agent")
-        }
+        sources = {definition.environment_path => source(definition, "environment")}
+        definition.roster_paths.each { |key, path| sources[path] = source(definition, "agent", key) }
+        sources[definition.agent_path] = source(definition, "agent")
         definition.deployment_paths.each { |key, path| sources[path] = source(definition, "deployment", key) }
         sources
       end
@@ -89,7 +88,7 @@ module ManagedAgents
       def source(definition, kind, key = "")
         case kind
         when "environment" then definition.environment.to_source
-        when "agent" then definition.agent.to_source
+        when "agent" then definition.agent_document(key).to_source
         when "deployment" then deployment_source(definition, definition.deployments.fetch(key))
         end
       end
@@ -164,6 +163,8 @@ module ManagedAgents
 
         if (match = base.match(Definition::DEPLOYMENT))
           [name, "deployment", match[:key] || "default"]
+        elsif (match = base.match(Definition::ROSTER))
+          [name, "agent", match[:key]]
         elsif (kind = %w[agent environment].find { |candidate| base.start_with?(candidate) })
           [name, kind, ""]
         end
