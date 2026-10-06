@@ -2,7 +2,7 @@
 
 [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) for Rails.
 
-Define agents as files under `app/agents`, sync them to the Claude API the way you run migrations,
+[Define agents](#defining-agents) as files under `app/agents`, sync them to the Claude API the way you run migrations,
 keep the remote IDs in your database, start sessions from your app, answer the agent's custom tools
 in Ruby, and generate a chat UI.
 
@@ -269,10 +269,17 @@ end
 vaults hold a credential for the same MCP server, the first one wins.
 
 ```ruby
-ResearchAgent.start("…", owner: user, vaults: [user, user.account, :agent])  # personal, then shared, then vault.yaml
-ResearchAgent.start("…", owner: user, vaults: [user.account])                # the organisation's only
-ResearchAgent.start("…", owner: user, vaults: [user])                        # personal only
-ResearchAgent.start("…", owner: user, vaults: [])                            # none
+# Personal, then shared, then vault.yaml
+ResearchAgent.start("…", owner: user, vaults: [user, user.account, :agent])
+
+# The organisation's only
+ResearchAgent.start("…", owner: user, vaults: [user.account])
+
+# Personal only
+ResearchAgent.start("…", owner: user, vaults: [user])
+
+# None
+ResearchAgent.start("…", owner: user, vaults: [])
 ```
 
 An entry can be a record, a `ManagedAgents::Vault`, a vault ID, `:agent` (the agent's `vault.yaml`),
@@ -297,10 +304,15 @@ An owner can keep more than one group of credentials: `account.agent_vault!(:bil
 ### Storing credentials
 
 ```ruby
-vault = user.agent_vault!   # created on the API the first time
+vault = user.agent_vault! # created on the API the first time
 vault.connect_bearer("https://mcp.linear.app/mcp", token: "lin_api_…")
-vault.connect_oauth("https://mcp.notion.com/mcp", access_token: "…", refresh_token: "…",
-  token_endpoint: "https://…/token", client_id: "…")
+vault.connect_oauth(
+  "https://mcp.notion.com/mcp",
+  access_token: "…",
+  refresh_token: "…",
+  token_endpoint: "https://…/token",
+  client_id: "…"
+)
 vault.connect_env("STRIPE_API_KEY", value: "sk_…", allowed_hosts: ["api.stripe.com"])
 vault.connected?("https://mcp.linear.app/mcp")
 vault.disconnect("https://mcp.linear.app/mcp")
@@ -349,8 +361,11 @@ connection as needing to be reconnected, and it no longer counts as connected.
 The generated controllers look everything up through `app/controllers/concerns/agent_access.rb`:
 
 ```ruby
-def agent_owner = current_user                      # sessions are scoped to this record
-def agent_vault_owners                              # whose credentials this person may manage
+# Sessions are scoped to this record
+def agent_owner = current_user
+
+# Whose credentials this person may manage
+def agent_vault_owners
   {"personal" => agent_owner, "organization" => current_user.account}.compact
 end
 ```
@@ -371,10 +386,12 @@ keeps tenants apart.
 ## Running sessions
 
 ```ruby
-session = SupportTriageAgent.start("Triage this ticket",
-  subject: ticket,          # any record; available to tool handlers as `subject`
+session = SupportTriageAgent.start(
+  "Triage this ticket",
+  subject: ticket,     # any record; available to tool handlers as `subject`
   title: "Ticket #42",
-  max_cost: 2.00)           # hard spend cap in dollars
+  max_cost: 2.00       # hard spend cap in dollars
+)
 
 session.send_message("Also check the billing history")
 session.interrupt!
@@ -388,7 +405,7 @@ is stored in `managed_agents_events`.
 
 ```ruby
 class Ticket < ApplicationRecord
-  has_agent_sessions   # ticket.agent_sessions
+  has_agent_sessions # ticket.agent_sessions
 end
 ```
 
@@ -517,7 +534,11 @@ class SupportTriageAgentTest < ActiveSupport::TestCase
 
   test "sets the priority the agent asks for" do
     sync_agents
-    anthropic.respond_with custom_tool_use("set_priority", priority: "high"), agent_message("Done."), idle
+    anthropic.respond_with(
+      custom_tool_use("set_priority", priority: "high"),
+      agent_message("Done."),
+      idle
+    )
 
     session = SupportTriageAgent.start("Triage", subject: tickets(:refund), run: false)
     session.run_now

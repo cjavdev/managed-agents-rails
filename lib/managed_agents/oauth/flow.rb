@@ -1,6 +1,5 @@
 require "securerandom"
 require "digest"
-require "base64"
 
 module ManagedAgents
   module OAuth
@@ -34,7 +33,7 @@ module ManagedAgents
           client_id: client.client_id,
           redirect_uri: redirect_uri,
           state: state,
-          code_challenge: Base64.urlsafe_encode64(Digest::SHA256.digest(verifier), padding: false),
+          code_challenge: [Digest::SHA256.digest(verifier)].pack("m0").tr("+/", "-_").delete("="),
           code_challenge_method: "S256",
           scope: scope,
           resource: server_url
