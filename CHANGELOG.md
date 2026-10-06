@@ -20,3 +20,4 @@
 - `optional: true` on a vault credential skips it when its secret isn't set.
 - Multiagent rosters: `agent-<role>.md` files referenced from a coordinator's `multiagent.agents`.
 - Custom skills as `skills/<name>/` folders, uploaded and pinned by version.
+- `connect: oauth` credentials in `vault.yaml`, signed in for with `managed_agents:connect`; `status --validate`.

@@ -217,6 +217,35 @@ credentials:
 
 The agent's vault is attached to every session it starts, unless the session asks for other vaults.
 
+### Signing in for an agent's own credentials
+
+Some MCP servers only take OAuth tokens, which can't be written in a file. Declare the credential
+with `connect: oauth` and sign in for it once per workspace:
+
+```yaml
+# app/agents/issue_fixer/vault.yaml
+display_name: issue-fixer
+credentials:
+  - display_name: Sentry
+    connect: oauth
+    scope: org:read event:write   # optional; defaults to what the server advertises
+    auth:
+      type: mcp_oauth
+      mcp_server_url: https://mcp.sentry.dev/mcp
+```
+
+```sh
+bin/rails managed_agents:sync                     # creates the vault, reports the credential as not connected
+bin/rails managed_agents:connect issue_fixer      # prints a sign-in link, stores the tokens in the vault
+bin/rails managed_agents:status --validate        # asks the API whether signed-in credentials still work
+```
+
+`connect` registers a client with the server, sends you to approve access (PKCE), and stores
+refreshable tokens, which Anthropic keeps fresh from then on. It waits for the browser on
+`--redirect-uri` (default `http://localhost:8976/callback`), and also accepts the address the browser
+landed on, pasted into the terminal, so it works from a remote console such as `render ssh`. Run it
+again to replace the tokens. Sync never touches a connected credential.
+
 ## Users, organisations and their credentials
 
 The vault in `vault.yaml` is shared by everyone. For credentials that belong to a person or to an
