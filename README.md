@@ -351,6 +351,39 @@ end
 - A tool call is answered once per call ID, including after a crash and replay. Handlers can still
   run twice if the process dies between running the handler and sending the result, so keep them
   idempotent.
+  `tool_use_id` is the call's ID inside a handler, and stays the same when the call is answered
+  again, so it can key an idempotent write.
+- `self.validate_tool_input = false` skips the schema check, for handlers that validate input
+  themselves.
+
+### Limits, events and cleanup
+
+For agents that do one job per session, unattended:
+
+```ruby
+class NightlyReportAgent < ApplicationAgent
+  # Interrupt a turn that runs longer than this, counted from the message
+  # that started it. A block is evaluated on the agent instance.
+  self.max_turn_duration = 30.minutes
+
+  # Archive the session when its turn ends, so it holds no container.
+  self.archive_after_turn = true
+
+  # Every event the runner reads, once, before a custom tool call is
+  # answered. Narrow it with event types.
+  on_event("span.model_request_end") do |event|
+    spent = subject.record_usage!(event.payload["model_usage"])
+    interrupt!(:budget) if spent > subject.budget
+  end
+
+  # Why the turn was stopped: :deadline, or what was passed to interrupt!.
+  on_interrupt { |reason| subject.update!(stop_reason: reason) }
+end
+```
+
+`max_cost` on `start` is the platform's own cap; `on_event` is for anything finer. While a turn has
+a deadline, the stream is never held past it, so an agent that has gone quiet is still interrupted
+on time.
 
 ### Scheduled deployments
 
