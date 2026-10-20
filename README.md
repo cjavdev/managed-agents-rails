@@ -409,6 +409,14 @@ class Ticket < ApplicationRecord
 end
 ```
 
+A session that already exists on the API (started by another process, or before the app used this
+gem) gets a record with `attach`, and its runner replays the whole log:
+
+```ruby
+session = SupportTriageAgent.attach("sesn_...", subject: ticket)
+session.run_now
+```
+
 An agent with no Ruby class still works: `ManagedAgents.agent("assistant").start("Hello")`.
 
 ### Custom tools

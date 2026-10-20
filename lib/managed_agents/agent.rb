@@ -166,6 +166,31 @@ module ManagedAgents
         session
       end
 
+      # Gives a session that already exists on the API a record here, once: one
+      # started before the app used this gem, by another process, or found by
+      # listing sessions. Its runner then replays the session's whole log.
+      #
+      #   session = IssueFixerAgent.attach("sesn_...", subject: run)
+      #   session.run_now
+      def attach(remote_id, subject: nil, owner: nil)
+        Session.find_by(remote_id: remote_id) || begin
+          remote = ManagedAgents.client.beta.sessions.retrieve(remote_id)
+          metadata = remote.try(:metadata)
+          Session.create!(
+            remote_id: remote_id,
+            agent_name: definition.name,
+            agent_version: remote.try(:agent).try(:version),
+            subject: subject,
+            owner: owner,
+            title: remote.try(:title),
+            metadata: metadata.nil? ? nil : Events.to_hash(metadata),
+            status: "running"
+          )
+        rescue ActiveRecord::RecordNotUnique
+          Session.find_by!(remote_id: remote_id)
+        end
+      end
+
       # Fires one of this agent's scheduled deployments now.
       def run_deployment(key)
         Deployments.run(definition.name, key.to_s)

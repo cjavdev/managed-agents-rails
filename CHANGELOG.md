@@ -22,3 +22,4 @@
 - Multiagent rosters: `agent-<role>.md` files referenced from a coordinator's `multiagent.agents`.
 - Custom skills as `skills/<name>/` folders, uploaded and pinned by version.
 - `connect: oauth` credentials in `vault.yaml`, signed in for with `managed_agents:connect`; `status --validate`.
+- `Agent.attach` gives a session that exists on the API a local record; a session with nothing recorded yet is followed until the API says it is idle.
