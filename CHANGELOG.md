@@ -25,3 +25,4 @@
 - `connect: oauth` credentials in `vault.yaml`, signed in for with `managed_agents:connect`; `status --validate`.
 - `Agent.attach` gives a session that exists on the API a local record; a session with nothing recorded yet is followed until the API says it is idle.
 - Sync rebuilds agents, environments, vaults, credentials and deployments that were deleted or archived outside the files (`--no-verify` to skip the check).
+- A skipped credential's `Change#detail` says which secret is missing and where to set it.

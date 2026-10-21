@@ -1,6 +1,8 @@
 module ManagedAgents
   class Sync
-    Change = Struct.new(:agent_name, :kind, :key, :action, :remote_id)
+    # `detail` says why, when the action needs explaining: for a skipped
+    # credential, which secret is not set and where to set it.
+    Change = Struct.new(:agent_name, :kind, :key, :action, :remote_id, :detail)
 
     module Digests
       module_function

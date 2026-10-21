@@ -79,7 +79,7 @@ module ManagedAgents
           # is left as it is, so one missing token doesn't stop the sync.
           resource = Resource.lookup(definition.name, "credential", key)
           @sync.say(:skipped, definition.name, "credential", key, error.message)
-          return Change.new(definition.name, "credential", key, :skipped, resource&.remote_id)
+          return Change.new(definition.name, "credential", key, :skipped, resource&.remote_id, error.message)
         end
         digest = Digests.secret_digest(body)
         resource = Resource.lookup(definition.name, "credential", key)
