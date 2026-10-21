@@ -20,6 +20,7 @@
 - `config.enabled` kill switch: while off, the client raises `ManagedAgents::Paused`, engine jobs skip and webhooks are dropped.
 - `optional: true` on a vault credential skips it when its secret isn't set.
 - Multiagent rosters: `agent-<role>.md` files referenced from a coordinator's `multiagent.agents`.
+- Roster and workflow agents of the `multiagent_20261001` type (`subagents.predefined_agents`, `workflows.predefined_agents`) resolved by path and pinned like a roster.
 - Custom skills as `skills/<name>/` folders, uploaded and pinned by version.
 - `connect: oauth` credentials in `vault.yaml`, signed in for with `managed_agents:connect`; `status --validate`.
 - `Agent.attach` gives a session that exists on the API a local record; a session with nothing recorded yet is followed until the API says it is idle.

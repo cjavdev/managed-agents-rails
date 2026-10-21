@@ -142,6 +142,21 @@ multiagent:
 ---
 ```
 
+The `multiagent_20261001` type works the same way: agents listed by path under
+`subagents.predefined_agents` (the roster) or `workflows.predefined_agents` (agents a dynamic
+workflow run may use) are synced first and pinned by version. The API backend resolves these paths.
+
+```markdown
+---
+name: Studio lead
+model: claude-opus-5-5
+multiagent:
+  type: multiagent_20261001
+  subagents: {type: enabled, predefined_agents: [./agent-writer.md]}
+  workflows: {type: enabled, predefined_agents: [./agent-writer.md, ./agent-critic.md]}
+---
+```
+
 Scaffold one with either command:
 
 ```sh

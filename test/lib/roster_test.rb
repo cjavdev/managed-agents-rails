@@ -76,4 +76,34 @@ class RosterTest < ActiveSupport::TestCase
 
     assert_includes ManagedAgents.definition("desk").problems, "desk: roster agent writer needs a model"
   end
+
+  test "agents listed for workflows and subagents are pinned like a roster" do
+    root = Rails.root.join(ManagedAgents.config.agents_path)
+    File.write(root.join("desk/agent.md"), <<~MD)
+      ---
+      name: Desk lead
+      model: claude-opus-5-5
+      multiagent:
+        type: multiagent_20261001
+        subagents: {type: enabled, predefined_agents: [./agent-writer.md]}
+        workflows: {type: enabled, predefined_agents: [./agent-writer.md, {type: self}]}
+      tools:
+        - type: custom
+          name: submit
+          description: Submit the result.
+          input_schema: {type: object, properties: {text: {type: string}}, required: [text]}
+      ---
+
+      You coordinate. Start a workflow run when the job has many pieces.
+    MD
+
+    sync
+
+    writer = resource("desk", "agent", "writer")
+    pinned = {type: "agent", id: writer.remote_id, version: 1}
+    multiagent = anthropic.calls_to(:"agent.create").last[:multiagent]
+    assert_equal [pinned], multiagent.dig(:subagents, :predefined_agents)
+    assert_equal [pinned, {type: "self"}], multiagent.dig(:workflows, :predefined_agents)
+    assert_equal "enabled", multiagent.dig(:workflows, :type)
+  end
 end
