@@ -30,6 +30,7 @@ class OptionalCredentialsTest < ActiveSupport::TestCase
 
     skipped = changes.find { |change| change.key == "https://mcp.render.example/mcp" }
     assert_equal :skipped, skipped.action
+    assert_equal "ENV[\"OPS_RENDER_TOKEN\"] is not set", skipped.detail, "says which secret is missing"
     assert_match "1 skipped", output
     assert_equal ["https://mcp.github.example/mcp"], anthropic.calls_to(:"vcrd.create").map { |call| call[:auth][:mcp_server_url] }
     assert_empty ManagedAgents.definition("ops").problems
