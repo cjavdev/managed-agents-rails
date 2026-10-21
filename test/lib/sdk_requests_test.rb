@@ -66,6 +66,7 @@ class SdkRequestsTest < ActiveSupport::TestCase
     ManagedAgents::Sync.new(backend: :api, io: StringIO.new).apply
 
     File.write(root.join("helper/agent.md"), "---\nname: Helper\nmodel: claude-opus-5-5\n---\n")
+    stub_api(:get, "environments/env_1", {id: "env_1", type: "environment", name: "helper-env", archived_at: nil})
     stub_api(:get, "agents/agent_1", {id: "agent_1", type: "agent", version: 4, name: "Helper"})
     stub_api(:post, "agents/agent_1", {id: "agent_1", type: "agent", version: 5, name: "Helper"})
     ManagedAgents::Sync.new(backend: :api, io: StringIO.new).apply
@@ -76,6 +77,23 @@ class SdkRequestsTest < ActiveSupport::TestCase
     assert update.key?("description") && update["description"].nil?
     assert_equal [], update["tools"]
     assert_equal "5", resource("helper", "agent").remote_version
+  end
+
+  test "an agent the API no longer has is created again" do
+    with_agents(agent_files("helper"))
+    stub_api(:post, "environments", {id: "env_1", type: "environment", name: "helper-env"})
+    stub_api(:post, "agents", {id: "agent_1", type: "agent", version: 1, name: "Helper"})
+    ManagedAgents::Sync.new(backend: :api, io: StringIO.new).apply
+
+    stub_api(:get, "environments/env_1", {id: "env_1", type: "environment", name: "helper-env", archived_at: nil})
+    stub_request(:get, "https://api.anthropic.com/v1/agents/agent_1?beta=true")
+      .to_return(status: 404, headers: {"Content-Type" => "application/json"},
+        body: {type: "error", error: {type: "not_found_error", message: "agent_1 not found"}}.to_json)
+    stub_api(:post, "agents", {id: "agent_2", type: "agent", version: 1, name: "Helper"})
+    ManagedAgents::Sync.new(backend: :api, io: StringIO.new).apply
+
+    assert_equal "agent_2", resource("helper", "agent").remote_id
+    assert_equal "env_1", resource("helper", "environment").remote_id
   end
 
   test "a person's vault and OAuth credential are created with the shapes the API expects" do

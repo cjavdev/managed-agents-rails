@@ -25,11 +25,12 @@ module Rails
       option :force, type: :boolean, default: false, desc: "Overwrite resources that were changed outside the files"
       option :prune, type: :boolean, default: false, desc: "Archive remote resources whose files were deleted"
       option :adopt, type: :boolean, default: false, desc: "Take over an existing resource with the same name"
+      option :verify, type: :boolean, default: true, desc: "Look up each recorded resource first and rebuild any that were deleted or archived"
       def sync
         boot_application!
         guard do
           ManagedAgents::Sync.new(only: options[:only], backend: options[:backend], dry_run: options[:dry_run],
-            force: options[:force], prune: options[:prune], adopt: options[:adopt]).apply
+            force: options[:force], prune: options[:prune], adopt: options[:adopt], verify: options[:verify]).apply
         end
       end
 

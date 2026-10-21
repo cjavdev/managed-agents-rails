@@ -15,16 +15,22 @@ module ManagedAgents
   # their credentials always go through the SDK, because `ant apply` does not
   # manage credentials.
   class Sync
-    attr_reader :dry_run, :force, :prune, :adopt, :io
+    # The kinds checked against the API before each sync (see #forget_missing).
+    VERIFIED = %w[vault credential environment agent deployment].freeze
 
+    attr_reader :dry_run, :force, :prune, :adopt, :verify, :io
+
+    # `verify: false` skips looking up each recorded resource before syncing:
+    # faster, but a resource deleted or archived outside the files is not rebuilt.
     def initialize(only: nil, backend: nil, dry_run: false, force: false, prune: false, adopt: false,
-      io: $stdout, client: nil)
+      verify: true, io: $stdout, client: nil)
       @only = only
       @requested_backend = backend
       @dry_run = dry_run
       @force = force
       @prune = prune
       @adopt = adopt
+      @verify = verify
       @io = io
       @client = client
     end
@@ -40,6 +46,7 @@ module ManagedAgents
       verify_workspace!
 
       exclusively do
+        forget_missing
         changes = definitions.flat_map { |definition| Vaults.new(self).apply(definition) }
         changes += backend.apply(definitions)
         changes += orphans.map { |resource| remove(resource) }
@@ -173,6 +180,41 @@ module ManagedAgents
           connection.release_advisory_lock(lock)
         end
       end
+    end
+
+    # A resource recorded here that is gone from the API (deleted, or archived
+    # in the Console, or its whole workspace reset) is forgotten, so this sync
+    # creates it again from the files instead of failing or skipping it. A
+    # vault that is gone takes its credentials with it: they are made again,
+    # and a signed-in one is reported as not connected. One retrieve per
+    # recorded resource synced through the API.
+    def forget_missing
+      return unless verify
+
+      names = definitions.map(&:name)
+      missing = Resource.where(agent_name: names, kind: VERIFIED, backend: "api")
+        .sort_by { |resource| VERIFIED.index(resource.kind) }.select { |resource| missing?(resource) }
+      missing.each do |resource|
+        say("missing", resource.agent_name, resource.kind, resource.key, "#{resource.remote_id} is gone; #{dry_run ? "would be" : "is"} made again")
+        next if dry_run
+
+        resource.destroy!
+        Resource.for_agent(resource.agent_name).of_kind("credential").destroy_all if resource.kind == "vault"
+      end
+    end
+
+    def missing?(resource)
+      remote = if resource.kind == "credential"
+        vault = Resource.lookup(resource.agent_name, "vault")
+        return true unless vault
+
+        client.beta.vaults.credentials.retrieve(resource.remote_id, vault_id: vault.remote_id)
+      else
+        client.beta.public_send(resource.kind.pluralize).retrieve(resource.remote_id)
+      end
+      remote.try(:archived_at).present?
+    rescue Anthropic::Errors::NotFoundError
+      true
     end
 
     def check!
