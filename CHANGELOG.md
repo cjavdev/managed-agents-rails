@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Memory stores as `memory.yaml` / `memory-<key>.yaml`: synced, attached to the agent's sessions, and rebuilt with skills when deleted outside the files.
 - Depends on railties, activerecord and activejob rather than all of Rails.
 - Agent definitions under `app/agents/<name>/`, rendered through ERB.
 - `managed_agents:create`, `sync`, `status` and `check` commands.

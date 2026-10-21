@@ -135,8 +135,10 @@ module ManagedAgents
       #   vaults:   whose credentials it acts with, in order of precedence;
       #             defaults to the agent's `vaults` declaration
       #   max_cost: a hard spend cap in dollars
+      #   memory:   attach the memory stores declared in the agent's folder
+      #             (memory.yaml, memory-<key>.yaml); false attaches none
       def start(message = nil, subject: nil, owner: nil, vaults: default_vaults, title: nil, metadata: nil,
-        resources: nil, max_cost: nil, pin_version: true, run: true)
+        resources: nil, max_cost: nil, pin_version: true, run: true, memory: true)
         version = agent_version if pin_version
         vault_ids = vault_chain(vaults, owner: owner).remote_ids
         params = {
@@ -144,7 +146,7 @@ module ManagedAgents
           environment_id: environment_id,
           title: title,
           metadata: metadata&.transform_values(&:to_s),
-          resources: resources,
+          resources: (Array(resources) + (memory ? memory_resources : [])).presence,
           vault_ids: vault_ids.presence,
           budget: max_cost && {type: "limit", max_list_cost: {amount: (max_cost * 100).round.to_s, currency: "USD"}}
         }.compact
@@ -188,6 +190,14 @@ module ManagedAgents
           )
         rescue ActiveRecord::RecordNotUnique
           Session.find_by!(remote_id: remote_id)
+        end
+      end
+
+      # The session resources for the agent's memory stores.
+      def memory_resources
+        definition.memory_paths.keys.map do |key|
+          {type: "memory_store", memory_store_id: Resource.remote_id!(definition.name, "memory_store", key)}
+            .merge(definition.memory_store_attachment(key).symbolize_keys)
         end
       end
 

@@ -96,6 +96,22 @@ class SdkRequestsTest < ActiveSupport::TestCase
     assert_equal "env_1", resource("helper", "environment").remote_id
   end
 
+  test "a memory store is created and attached to sessions in the shapes the API expects" do
+    with_agents(agent_files("helper").merge("helper/memory.yaml" => "description: Notes\naccess: read_only\n"))
+    stub_api(:post, "environments", {id: "env_1", type: "environment", name: "helper-env"})
+    stub_api(:post, "agents", {id: "agent_1", type: "agent", version: 1, name: "Helper"})
+    stub_api(:post, "memory_stores", {id: "memstore_1", type: "memory_store", name: "helper memory", description: "Notes",
+      metadata: {}, archived_at: nil, created_at: "2026-10-21T12:00:00Z", updated_at: "2026-10-21T12:00:00Z"})
+    ManagedAgents::Sync.new(backend: :api, io: StringIO.new).apply
+
+    assert_equal({"name" => "helper memory", "description" => "Notes"}, body_of(:post, "memory_stores"))
+    assert_equal "agent-memory-2026-07-22", @requests.find { |method, path| method == :post && path == "memory_stores" }.last["Anthropic-Beta"]
+
+    stub_api(:post, "sessions", {id: "sesn_1", type: "session", status: "idle"})
+    ManagedAgents.agent("helper").start(run: false)
+    assert_equal [{"type" => "memory_store", "memory_store_id" => "memstore_1", "access" => "read_only"}], body_of(:post, "sessions")["resources"]
+  end
+
   test "a person's vault and OAuth credential are created with the shapes the API expects" do
     user = User.create!(name: "Dana")
     stub_api(:post, "vaults", {id: "vlt_9", type: "vault", display_name: "User #{user.id}"})
