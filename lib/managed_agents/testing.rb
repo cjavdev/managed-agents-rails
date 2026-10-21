@@ -273,7 +273,7 @@ module ManagedAgents
     end
 
     class Beta
-      attr_reader :agents, :environments, :vaults, :deployments, :deployment_runs, :sessions, :skills, :webhooks
+      attr_reader :agents, :environments, :vaults, :deployments, :deployment_runs, :sessions, :skills, :memory_stores, :webhooks
 
       def initialize(client)
         @agents = Collection.new(client, "agent", versioned: true)
@@ -283,6 +283,7 @@ module ManagedAgents
         @deployment_runs = DeploymentRuns.new(client, "drun")
         @sessions = Sessions.new(client)
         @skills = Skills.new(client)
+        @memory_stores = Collection.new(client, "memstore")
         @webhooks = Webhooks.new
       end
     end

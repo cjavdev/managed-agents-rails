@@ -7,6 +7,7 @@ module ManagedAgents
     EXTENSIONS = %w[md yaml yml].freeze
     DEPLOYMENT = /\Adeployment(?:[-_](?<key>.+))?\.(?:md|ya?ml)\z/
     ROSTER = /\Aagent[-_](?<key>.+)\.(?:md|ya?ml)\z/
+    MEMORY = /\Amemory(?:[-_](?<key>.+))?\.ya?ml\z/
 
     Reference = Struct.new(:agent_name, :kind, :key)
 
@@ -47,6 +48,35 @@ module ManagedAgents
     def environment_path = file("environment")
 
     def vault_path = file("vault")
+
+    # Memory stores, keyed by the part of the file name after memory-:
+    # memory.yaml is "default", memory-research.yaml is "research".
+    def memory_paths
+      return {} unless root.directory?
+
+      found = root.children.each_with_object({}) do |path, paths|
+        match = path.basename.to_s.match(MEMORY)
+        paths[match[:key] || "default"] = path if match
+      end
+      found.sort_by { |key, _| [(key == "default") ? 0 : 1, key] }.to_h
+    end
+
+    def memory_stores
+      memory_paths.transform_values { |path| document(path) }
+    end
+
+    # The memory_stores.create body. The name defaults to the agent's and the key.
+    def memory_store_body(key)
+      data = memory_stores.fetch(key).data
+      default_name = [name, ("memory" if key == "default") || key].join(" ").tr("_", " ")
+      {"name" => default_name}.merge(data.slice("name", "description", "metadata"))
+    end
+
+    # How a session gets the store: read_write (the default) or read_only, and
+    # optional instructions for the agent on how to use it.
+    def memory_store_attachment(key)
+      memory_stores.fetch(key).data.slice("access", "instructions")
+    end
 
     def deployment_paths
       return {} unless root.directory?
@@ -213,6 +243,12 @@ module ManagedAgents
           if deployment.body.nil? && deployment.data["initial_events"].blank?
             problems << "#{name}: deployment #{key} needs initial_events or a Markdown body"
           end
+        end
+      end
+      check(problems) do
+        memory_stores.each do |key, document|
+          access = document.data["access"]
+          problems << "#{name}: memory #{key} access must be read_write or read_only" unless access.nil? || %w[read_write read_only].include?(access)
         end
       end
       check(problems) do

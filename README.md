@@ -157,6 +157,22 @@ multiagent:
 ---
 ```
 
+### Memory stores
+
+A `memory.yaml` (or `memory-<key>.yaml` for more than one) in an agent's folder is a memory store:
+somewhere the agent keeps what it learns from one session to the next. Sync creates it, and every
+session the agent starts gets it attached.
+
+```yaml
+# app/agents/researcher/memory.yaml
+description: What the researcher has learned about each ticker
+access: read_write          # or read_only
+instructions: Check here before researching a ticker, and add what you find.
+```
+
+`name` defaults to the agent's. `start(memory: false)` starts a session without them. Sync only
+changes a store's name, description and metadata; what the agents wrote stays.
+
 Scaffold one with either command:
 
 ```sh
@@ -187,9 +203,10 @@ development and production never share IDs, and nothing needs to be committed.
 
 ### Rebuilding what was deleted
 
-Before it changes anything, sync looks up each resource it recorded. One that was deleted or
-archived outside the files (in the Console, or with the whole workspace) is created again from the
-files, along with whatever points at it. A vault that is gone takes its credentials with it:
+Before it changes anything, sync looks up each resource it recorded (skills, memory stores, vaults,
+credentials, environments, agents, deployments). One that was deleted or archived outside the files
+(in the Console, or with the whole workspace) is created again from the files, along with whatever
+points at it. A memory store made again starts empty. A vault that is gone takes its credentials with it:
 they are made again, and one that needs a sign-in (`connect: oauth`) is reported as not connected.
 `--dry-run` lists what is missing; `--no-verify` skips the lookups and trusts the records. If the
 API keeps the name of an archived environment reserved, add `--adopt`.
@@ -592,8 +609,7 @@ The helper swaps in an in-memory client for each test. `anthropic.calls` records
 
 ## Not covered yet
 
-Memory stores as files, per-tenant agent definitions or overrides,
-outcomes, and self-hosted sandboxes.
+Per-tenant agent definitions or overrides, outcomes, and self-hosted sandboxes.
 
 ## Development
 

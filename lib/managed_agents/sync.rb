@@ -2,6 +2,7 @@ require "digest"
 require "zlib"
 require "managed_agents/sync/change"
 require "managed_agents/sync/vaults"
+require "managed_agents/sync/memory_stores"
 require "managed_agents/sync/api_backend"
 require "managed_agents/sync/ant_backend"
 
@@ -16,7 +17,7 @@ module ManagedAgents
   # manage credentials.
   class Sync
     # The kinds checked against the API before each sync (see #forget_missing).
-    VERIFIED = %w[vault credential environment agent deployment].freeze
+    VERIFIED = %w[skill memory_store vault credential environment agent deployment].freeze
 
     attr_reader :dry_run, :force, :prune, :adopt, :verify, :io
 
@@ -48,6 +49,7 @@ module ManagedAgents
       exclusively do
         forget_missing
         changes = definitions.flat_map { |definition| Vaults.new(self).apply(definition) }
+        changes += definitions.flat_map { |definition| MemoryStores.new(self).apply(definition) }
         changes += backend.apply(definitions)
         changes += orphans.map { |resource| remove(resource) }
 
@@ -155,6 +157,7 @@ module ManagedAgents
     def current_digest(definition, kind, key, resource)
       case kind
       when "vault" then Vaults.vault_digest(definition)
+      when "memory_store" then MemoryStores.digest(definition, key)
       when "credential"
         Vaults.credential_digest(definition.credentials.find { |credential| Vaults.key(credential) == key })
       else backend_for(resource).digest(definition, kind, key)
@@ -232,6 +235,7 @@ module ManagedAgents
 
     def expected(definition)
       rows = definition.skill_paths.map { |key, path| ["skill", key, path] }
+      definition.memory_paths.each { |key, path| rows << ["memory_store", key, path] }
       rows << ["environment", "", definition.environment_path] unless definition.shared_environment?
       definition.roster_paths.each { |key, path| rows << ["agent", key, path] }
       rows << ["agent", "", definition.agent_path]
@@ -273,6 +277,8 @@ module ManagedAgents
       # to it, so pruning only forgets the local row.
       when "skill" then nil
       when "vault" then client.beta.vaults.archive(resource.remote_id)
+      # What the agents remembered goes with it, so only --prune does this.
+      when "memory_store" then client.beta.memory_stores.archive(resource.remote_id)
       when "credential"
         vault = Resource.lookup(resource.agent_name, "vault")
         client.beta.vaults.credentials.archive(resource.remote_id, vault_id: vault.remote_id) if vault
