@@ -170,6 +170,15 @@ development and production never share IDs, and nothing needs to be committed.
 | `--prune` | Archive remote resources whose files were deleted |
 | `--adopt` | Take over an existing environment or credential with the same name |
 
+### Rebuilding what was deleted
+
+Before it changes anything, sync looks up each resource it recorded. One that was deleted or
+archived outside the files (in the Console, or with the whole workspace) is created again from the
+files, along with whatever points at it. A vault that is gone takes its credentials with it:
+they are made again, and one that needs a sign-in (`connect: oauth`) is reported as not connected.
+`--dry-run` lists what is missing; `--no-verify` skips the lookups and trusts the records. If the
+API keeps the name of an archived environment reserved, add `--adopt`.
+
 ### Backends
 
 - **ant**: used when the [`ant` CLI](https://platform.claude.com/docs/en/cli-sdks-libraries/cli/apply)
