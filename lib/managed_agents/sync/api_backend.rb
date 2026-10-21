@@ -9,6 +9,11 @@ module ManagedAgents
       # agent.md would leave the old value in place.
       AGENT_CLEARS = {system_: nil, description: nil, tools: [], mcp_servers: [], skills: []}.freeze
 
+      # Where a coordinator lists other agents: the roster of the `coordinator`
+      # type, and the roster and the agents a workflow run may use on the
+      # `multiagent_20261001` type.
+      ROSTER_LISTS = [%w[agents], %w[subagents predefined_agents], %w[workflows predefined_agents]].freeze
+
       def initialize(sync)
         @sync = sync
       end
@@ -140,8 +145,14 @@ module ManagedAgents
       def agent_body(definition, key)
         body = definition.agent_body(key).deep_dup
         from = definition.agent_document_path(key)
-        roster = body.dig("multiagent", "agents")
-        body["multiagent"]["agents"] = roster.map { |value| agent_reference(definition, value, from) } if roster.is_a?(Array)
+        if (multiagent = body["multiagent"]).is_a?(Hash)
+          ROSTER_LISTS.each do |*parents, list|
+            holder = parents.empty? ? multiagent : multiagent.dig(*parents)
+            next unless holder.is_a?(Hash) && holder[list].is_a?(Array)
+
+            holder[list] = holder[list].map { |value| agent_reference(definition, value, from) }
+          end
+        end
         body["skills"] = body["skills"].map { |value| skill_reference(definition, value, from) } if body["skills"].is_a?(Array)
         body
       end
