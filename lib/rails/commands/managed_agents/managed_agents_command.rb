@@ -34,6 +34,16 @@ module Rails
         end
       end
 
+      desc "deploy", "Sync as a deploy step: rebuild what is missing, report what needs a person, never fail the deploy"
+      option :strict, type: :boolean, default: false, desc: "Fail when the sync fails, instead of reporting it and carrying on"
+      def deploy
+        boot_application!
+        ManagedAgents::Deploy.run(raise_errors: options[:strict])
+      rescue ManagedAgents::Error, Anthropic::Errors::Error => error
+        say_error "#{error.class.name.demodulize}: #{error.message}"
+        exit 1
+      end
+
       desc "status", "Show which definitions are synced, pending or orphaned"
       option :validate, type: :boolean, default: false, desc: "Also check that signed-in credentials still work"
       def status
