@@ -26,5 +26,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "railties", ">= 7.2", "< 9"
   spec.add_dependency "activerecord", ">= 7.2", "< 9"
   spec.add_dependency "activejob", ">= 7.2", "< 9"
-  spec.add_dependency "anthropic", "~> 1.72"
+  spec.add_dependency "anthropic", ">= 1.72", "< 3"
 end

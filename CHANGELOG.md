@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Works with the `anthropic` gem 2.x (API version `2026-10-21`) as well as 1.72 and up.
+
 - Memory stores as `memory.yaml` / `memory-<key>.yaml`: synced, attached to the agent's sessions, and rebuilt with skills when deleted outside the files.
 - Depends on railties, activerecord and activejob rather than all of Rails.
 - Agent definitions under `app/agents/<name>/`, rendered through ERB.
