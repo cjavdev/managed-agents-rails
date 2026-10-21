@@ -185,6 +185,32 @@ development and production never share IDs, and nothing needs to be committed.
 | `--prune` | Archive remote resources whose files were deleted |
 | `--adopt` | Take over an existing environment or credential with the same name |
 
+### On deploy
+
+```sh
+bin/rails db:migrate && bin/rails managed_agents:deploy
+```
+
+`managed_agents:deploy` is sync for a deploy step (Render's pre-deploy command, a Heroku release
+phase, a Kamal hook). It rebuilds what was deleted, takes over a leftover of the same name, and does
+not fail the deploy when the sync cannot run: the agents keep their last synced versions and the
+error goes to `Rails.error`. Pass `--strict` to fail instead. What needs a person is printed and
+published, so the app can alert on it:
+
+```ruby
+# config/initializers/managed_agents.rb
+ActiveSupport::Notifications.subscribe("deploy.managed_agents") do |event|
+  report = event.payload[:report]
+  # report.missing_secrets: credentials whose secret is not set (change.detail says where)
+  # report.sign_in_commands: `managed_agents:connect` commands for connect: oauth credentials
+  # report.error: what stopped the sync, if anything
+  OpsMailer.agents(report.summary).deliver_later if report.attention?
+end
+```
+
+Keep secrets in Rails credentials and name them in `vault.yaml` (`{credential: "service.key"}`): each
+deploy pushes them, and a changed one is rotated in place.
+
 ### Rebuilding what was deleted
 
 Before it changes anything, sync looks up each resource it recorded. One that was deleted or
