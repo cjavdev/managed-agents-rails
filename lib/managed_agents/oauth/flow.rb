@@ -8,11 +8,11 @@ module ManagedAgents
     class Flow
       # What has to survive between sending the person away and their return.
       # Keep it in the session: the code verifier must not leave the server.
-      Request = Struct.new(:url, :state, :code_verifier, :server_url, :redirect_uri, :scope, keyword_init: true) do
+      Request = Struct.new(:url, :state, :code_verifier, :server_url, :redirect_uri, :scope) do
         def to_h = super.except(:url).compact.stringify_keys
       end
 
-      Tokens = Struct.new(:access_token, :refresh_token, :expires_at, :scope, keyword_init: true)
+      Tokens = Struct.new(:access_token, :refresh_token, :expires_at, :scope)
 
       attr_reader :server_url, :redirect_uri
 
