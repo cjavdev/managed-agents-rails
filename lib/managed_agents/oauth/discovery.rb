@@ -7,7 +7,7 @@ module ManagedAgents
     # server metadata (RFC 8414). Servers that predate this are assumed to
     # serve the endpoints themselves, at /authorize, /token and /register.
     class Discovery
-      Metadata = Struct.new(:issuer, :authorization_endpoint, :token_endpoint, :registration_endpoint, :scopes, keyword_init: true) do
+      Metadata = Struct.new(:issuer, :authorization_endpoint, :token_endpoint, :registration_endpoint, :scopes) do
         def to_h = super.stringify_keys
       end
 
