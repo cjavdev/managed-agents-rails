@@ -9,7 +9,7 @@ module ManagedAgents
   #   }
   class OAuthClient < ApplicationRecord
     # A client taken from configuration rather than registered.
-    Configured = Struct.new(:client_id, :client_secret, :auth_method, :scope, :endpoints, keyword_init: true)
+    Configured = Struct.new(:client_id, :client_secret, :auth_method, :scope, :endpoints)
 
     self.table_name = "managed_agents_oauth_clients"
 
