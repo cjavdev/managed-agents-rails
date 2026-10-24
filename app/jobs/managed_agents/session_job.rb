@@ -16,7 +16,14 @@ module ManagedAgents
       when :busy
         # Another job is following the session. Check back in case it settles
         # just before something new arrives.
-        self.class.set(wait: 5.seconds).perform_later(session, attempt + 1) if attempt < RETRIES_WHILE_BUSY
+        if attempt < RETRIES_WHILE_BUSY
+          self.class.set(wait: 5.seconds).perform_later(session, attempt + 1)
+        elsif attempt == RETRIES_WHILE_BUSY && (expires = session.reload.lease_expires_at)
+          # A follower that died with its process (a deploy's restart) keeps the
+          # lease until it runs out, long after the quick checks above give up.
+          # One last look then: a live follower has renewed it, a dead one hasn't.
+          self.class.set(wait: [expires - Time.current, 0].max + 1.second).perform_later(session, attempt + 1)
+        end
       when :stalled
         ManagedAgents.logger.warn("[managed_agents] Session #{session.remote_id} produced no events; stopped following it")
       end

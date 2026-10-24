@@ -12,7 +12,9 @@ class SdkRequestsTest < ActiveSupport::TestCase
   end
 
   def stub_api(method, path, response, query: {})
-    stub_request(method, "#{API}/#{path}").with(query: {"beta" => "true"}.merge(query)).to_return do |request|
+    # anthropic 2.3 stopped adding ?beta=true to beta paths; match either way.
+    url = %r{\A#{Regexp.escape("#{API}/#{path}")}(\?|\z)}
+    stub_request(method, url).with { |request| URI.decode_www_form(request.uri.query.to_s).to_h.except("beta") == query }.to_return do |request|
       @requests << [method, path, request.body.present? ? JSON.parse(request.body) : nil, request.headers]
       body = response.respond_to?(:call) ? response.call(request) : response
       body.is_a?(String) ? {status: 200, body: body, headers: {"content-type" => "text/event-stream"}} :
@@ -86,7 +88,7 @@ class SdkRequestsTest < ActiveSupport::TestCase
     ManagedAgents::Sync.new(backend: :api, io: StringIO.new).apply
 
     stub_api(:get, "environments/env_1", {id: "env_1", type: "environment", name: "helper-env", archived_at: nil})
-    stub_request(:get, "https://api.anthropic.com/v1/agents/agent_1?beta=true")
+    stub_request(:get, %r{\A#{API}/agents/agent_1(\?beta=true)?\z}o)
       .to_return(status: 404, headers: {"Content-Type" => "application/json"},
         body: {type: "error", error: {type: "not_found_error", message: "agent_1 not found"}}.to_json)
     stub_api(:post, "agents", {id: "agent_2", type: "agent", version: 1, name: "Helper"})
