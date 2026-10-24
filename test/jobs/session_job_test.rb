@@ -32,11 +32,32 @@ class SessionJobTest < ActiveSupport::TestCase
     end
   end
 
-  test "gives up checking back after a while" do
+  test "after the quick checks, looks once more when the other follower's lease runs out" do
+    @session.acquire_lease("other", ttl: 60)
+
+    freeze_time do
+      assert_enqueued_with(job: ManagedAgents::SessionJob, args: [@session, ManagedAgents::SessionJob::RETRIES_WHILE_BUSY + 1], at: 61.seconds.from_now) do
+        ManagedAgents::SessionJob.perform_now(@session, ManagedAgents::SessionJob::RETRIES_WHILE_BUSY)
+      end
+    end
+  end
+
+  test "takes over a session whose follower died with its process" do
+    @session.acquire_lease("dead", ttl: 60)
+    anthropic.respond_with agent_message("Done."), idle
+
+    travel 61.seconds do
+      ManagedAgents::SessionJob.perform_now(@session, ManagedAgents::SessionJob::RETRIES_WHILE_BUSY + 1)
+    end
+
+    assert @session.reload.settled?
+  end
+
+  test "gives up when a live follower still holds the session after that" do
     @session.acquire_lease("other", ttl: 60)
 
     assert_no_enqueued_jobs do
-      ManagedAgents::SessionJob.perform_now(@session, ManagedAgents::SessionJob::RETRIES_WHILE_BUSY)
+      ManagedAgents::SessionJob.perform_now(@session, ManagedAgents::SessionJob::RETRIES_WHILE_BUSY + 1)
     end
   end
 
